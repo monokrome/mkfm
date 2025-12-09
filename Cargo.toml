@@ -1,0 +1,33 @@
+[package]
+name = "mkfm"
+version = "0.1.0"
+edition = "2024"
+description = "A minimal file manager with vim-like modal keybindings"
+license = "GPL-3.0"
+
+[dependencies]
+# UI toolkit
+mkframe = { path = "../mkframe" }
+
+# Image loading and EXIF
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+kamadak-exif = "0.6"
+
+# System
+libc = "0.2"
+
+# File system
+walkdir = "2"
+mime_guess = "2"
+
+# Async runtime for file operations
+tokio = { version = "1", features = ["rt", "fs", "sync"] }
+
+# Configuration management
+prefer = "0.2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
