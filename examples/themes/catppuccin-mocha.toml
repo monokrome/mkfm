@@ -1,0 +1,14 @@
+# Catppuccin Mocha theme
+# https://github.com/catppuccin/catppuccin
+
+background = "#1e1e2e"
+foreground = "#cdd6f4"
+cursor_bg = "#313244"
+selection_bg = "#45475a"
+directory = "#cba6f7"
+header_bg = "#181825"
+status_bg = "#181825"
+border = "#585b70"
+border_focused = "#f5c2e7"
+icon_folder = "\uf07b"
+icon_file = "\uf15b"

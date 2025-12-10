@@ -1,0 +1,14 @@
+# Monokai theme
+# https://monokai.pro/
+
+background = "#272822"
+foreground = "#f8f8f2"
+cursor_bg = "#3e3d32"
+selection_bg = "#49483e"
+directory = "#a6e22e"
+header_bg = "#1e1f1c"
+status_bg = "#1e1f1c"
+border = "#75715e"
+border_focused = "#f92672"
+icon_folder = "\uf07b"
+icon_file = "\uf15b"

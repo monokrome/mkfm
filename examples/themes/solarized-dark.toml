@@ -1,0 +1,14 @@
+# Solarized Dark theme
+# https://ethanschoonover.com/solarized/
+
+background = "#002b36"
+foreground = "#839496"
+cursor_bg = "#073642"
+selection_bg = "#073642"
+directory = "#268bd2"
+header_bg = "#073642"
+status_bg = "#073642"
+border = "#586e75"
+border_focused = "#268bd2"
+icon_folder = "\uf07b"
+icon_file = "\uf15b"

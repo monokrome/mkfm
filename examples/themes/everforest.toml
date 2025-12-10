@@ -1,0 +1,14 @@
+# Everforest Dark theme
+# https://github.com/sainnhe/everforest
+
+background = "#2d353b"
+foreground = "#d3c6aa"
+cursor_bg = "#343f44"
+selection_bg = "#3d484d"
+directory = "#a7c080"
+header_bg = "#232a2e"
+status_bg = "#232a2e"
+border = "#475258"
+border_focused = "#83c092"
+icon_folder = "\uf07b"
+icon_file = "\uf15b"

@@ -1,0 +1,14 @@
+# Gruvbox Dark theme
+# https://github.com/morhetz/gruvbox
+
+background = "#282828"
+foreground = "#ebdbb2"
+cursor_bg = "#3c3836"
+selection_bg = "#504945"
+directory = "#fabd2f"
+header_bg = "#3c3836"
+status_bg = "#3c3836"
+border = "#665c54"
+border_focused = "#fe8019"
+icon_folder = "\uf07b"
+icon_file = "\uf15b"

@@ -19,12 +19,15 @@ libc = "0.2"
 # File system
 walkdir = "2"
 mime_guess = "2"
+infer = "0.16"
 
 # Async runtime for file operations
 tokio = { version = "1", features = ["rt", "fs", "sync"] }
 
 # Configuration management
 prefer = "0.2"
+toml = "0.8"
+dirs = "5"
 
 [profile.release]
 opt-level = "z"

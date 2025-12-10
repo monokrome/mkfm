@@ -1,0 +1,14 @@
+# Tokyo Night theme
+# https://github.com/enkia/tokyo-night-vscode-theme
+
+background = "#1a1b26"
+foreground = "#a9b1d6"
+cursor_bg = "#292e42"
+selection_bg = "#33467c"
+directory = "#7aa2f7"
+header_bg = "#16161e"
+status_bg = "#16161e"
+border = "#414868"
+border_focused = "#7dcfff"
+icon_folder = "\uf07b"
+icon_file = "\uf15b"

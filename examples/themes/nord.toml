@@ -1,0 +1,14 @@
+# Nord theme
+# https://www.nordtheme.com/
+
+background = "#2e3440"
+foreground = "#d8dee9"
+cursor_bg = "#3b4252"
+selection_bg = "#434c5e"
+directory = "#81a1c1"
+header_bg = "#3b4252"
+status_bg = "#3b4252"
+border = "#4c566a"
+border_focused = "#88c0d0"
+icon_folder = "\uf07b"
+icon_file = "\uf15b"
