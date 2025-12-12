@@ -104,6 +104,23 @@ pub enum Action {
     ExtractArchive,
     // Symlinks
     CreateSymlink,
+    // Search highlighting
+    ClearSearchHighlight,
+    // Fold (inline expansion)
+    FoldOpen,
+    FoldClose,
+    FoldToggle,
+    FoldOpenRecursive,
+    FoldCloseRecursive,
+    // Task/Error list (quickfix-style)
+    NextTask,
+    PrevTask,
+    ToggleTaskList,
+    NextError,
+    PrevError,
+    ToggleErrorList,
+    // Feature list
+    ToggleFeatureList,
 }
 
 pub fn handle_normal_key(key: &str, pending: &str) -> Action {
@@ -147,6 +164,14 @@ pub fn handle_normal_key(key: &str, pending: &str) -> Action {
         ("[", "d") => Action::PrevDirectory,
         ("]", "d") => Action::NextDirectory,
 
+        // Task list (quickfix-like): ]q / [q
+        ("]", "q") => Action::NextTask,
+        ("[", "q") => Action::PrevTask,
+
+        // Error list (location-list-like): ]l / [l
+        ("]", "l") => Action::NextError,
+        ("[", "l") => Action::PrevError,
+
         // "yy" yanks
         ("y", "y") => Action::Yank,
         ("", "y") => Action::Pending,
@@ -177,6 +202,7 @@ pub fn handle_normal_key(key: &str, pending: &str) -> Action {
         (_, "/") => Action::EnterSearchMode,
         (_, "n") => Action::SearchNext,
         (_, "N") => Action::SearchPrev,
+        (_, "C-l") => Action::ClearSearchHighlight,
 
         // Sorting
         (_, "s") => Action::CycleSort,
@@ -184,6 +210,17 @@ pub fn handle_normal_key(key: &str, pending: &str) -> Action {
 
         // Archives
         (_, "e") => Action::ExtractArchive,
+
+        // Fold (inline expansion) - z-prefix
+        ("z", "o") => Action::FoldOpen,
+        ("z", "c") => Action::FoldClose,
+        ("z", "a") => Action::FoldToggle,
+        ("z", "O") => Action::FoldOpenRecursive,
+        ("z", "C") => Action::FoldCloseRecursive,
+        ("", "z") => Action::Pending,
+
+        // Feature list
+        (_, "F12") => Action::ToggleFeatureList,
 
         // Single key commands
         (_, "j") => Action::MoveCursor(1),
@@ -249,9 +286,52 @@ fn handle_search_key(key: &str) -> Action {
     }
 }
 
-pub fn handle_key(mode: Mode, key: &str, pending: &str) -> Action {
+/// Handle keyboard input for non-vim (standard) mode
+fn handle_normal_key_standard(key: &str) -> Action {
+    match key {
+        // Arrow key navigation
+        "Up" => Action::MoveCursor(-1),
+        "Down" => Action::MoveCursor(1),
+        "Home" => Action::CursorToTop,
+        "End" => Action::CursorToBottom,
+        "PageUp" => Action::MoveCursor(-10),
+        "PageDown" => Action::MoveCursor(10),
+
+        // Enter and navigation
+        "\n" | "Right" => Action::EnterDirectory,
+        "Left" | "\u{8}" => Action::ParentDirectory,  // Backspace
+
+        // File operations
+        "Delete" => Action::Trash,
+        "C-c" => Action::Yank,
+        "C-x" => Action::Cut,
+        "C-v" => Action::Paste,
+
+        // Search
+        "C-f" => Action::EnterSearchMode,
+        "F3" => Action::SearchNext,
+        "S-F3" => Action::SearchPrev,
+
+        // Misc
+        "F5" => Action::ParentDirectory,  // Refresh (re-enter current dir)
+        "\u{1b}" => Action::ClearSearchHighlight,  // Escape
+        "C-h" => Action::ToggleHidden,
+        "F2" => Action::OpenFile,
+        "F12" => Action::ToggleFeatureList,
+
+        _ => Action::None,
+    }
+}
+
+pub fn handle_key(mode: Mode, key: &str, pending: &str, vi_mode: bool) -> Action {
     match mode {
-        Mode::Normal => handle_normal_key(key, pending),
+        Mode::Normal => {
+            if vi_mode {
+                handle_normal_key(key, pending)
+            } else {
+                handle_normal_key_standard(key)
+            }
+        }
         Mode::Visual => handle_visual_key(key),
         Mode::Command => handle_command_key(key),
         Mode::Search => handle_search_key(key),
@@ -388,10 +468,17 @@ mod tests {
 
     #[test]
     fn test_handle_key_dispatches_correctly() {
-        assert!(matches!(handle_key(Mode::Normal, "j", ""), Action::MoveCursor(1)));
-        assert!(matches!(handle_key(Mode::Visual, "y", ""), Action::Yank));
-        assert!(matches!(handle_key(Mode::Command, "\n", ""), Action::CommandExecute));
-        assert!(matches!(handle_key(Mode::Search, "\n", ""), Action::SearchExecute));
+        // Vim mode
+        assert!(matches!(handle_key(Mode::Normal, "j", "", true), Action::MoveCursor(1)));
+        assert!(matches!(handle_key(Mode::Visual, "y", "", true), Action::Yank));
+        assert!(matches!(handle_key(Mode::Command, "\n", "", true), Action::CommandExecute));
+        assert!(matches!(handle_key(Mode::Search, "\n", "", true), Action::SearchExecute));
+
+        // Standard mode
+        assert!(matches!(handle_key(Mode::Normal, "Down", "", false), Action::MoveCursor(1)));
+        assert!(matches!(handle_key(Mode::Normal, "Up", "", false), Action::MoveCursor(-1)));
+        assert!(matches!(handle_key(Mode::Normal, "C-c", "", false), Action::Yank));
+        assert!(matches!(handle_key(Mode::Normal, "C-v", "", false), Action::Paste));
     }
 
     #[test]
@@ -410,6 +497,7 @@ mod tests {
         assert!(matches!(handle_normal_key("/", ""), Action::EnterSearchMode));
         assert!(matches!(handle_normal_key("n", ""), Action::SearchNext));
         assert!(matches!(handle_normal_key("N", ""), Action::SearchPrev));
+        assert!(matches!(handle_normal_key("C-l", ""), Action::ClearSearchHighlight));
     }
 
     #[test]
@@ -443,5 +531,15 @@ mod tests {
         assert_eq!(SortMode::Size.next(), SortMode::Date);
         assert_eq!(SortMode::Date.next(), SortMode::Type);
         assert_eq!(SortMode::Type.next(), SortMode::Name);
+    }
+
+    #[test]
+    fn test_normal_mode_fold() {
+        assert!(matches!(handle_normal_key("z", ""), Action::Pending));
+        assert!(matches!(handle_normal_key("o", "z"), Action::FoldOpen));
+        assert!(matches!(handle_normal_key("c", "z"), Action::FoldClose));
+        assert!(matches!(handle_normal_key("a", "z"), Action::FoldToggle));
+        assert!(matches!(handle_normal_key("O", "z"), Action::FoldOpenRecursive));
+        assert!(matches!(handle_normal_key("C", "z"), Action::FoldCloseRecursive));
     }
 }

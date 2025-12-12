@@ -14,6 +14,7 @@ pub struct SavedSettings {
     pub show_parent_entry: Option<bool>,
     pub overlay_enabled: Option<bool>,
     pub theme: Option<String>,
+    pub vi: Option<bool>,
 }
 
 impl SavedSettings {
@@ -64,6 +65,9 @@ impl SavedSettings {
                 table.insert("theme".to_string(), toml::Value::String(v.clone()));
             }
         }
+        if let Some(v) = self.vi {
+            table.insert("vi".to_string(), toml::Value::Boolean(v));
+        }
 
         // Write to file
         let content = toml::to_string_pretty(&table)
@@ -112,12 +116,14 @@ pub struct Theme {
     pub foreground: Rgb,
     pub cursor_bg: Rgba,
     pub selection_bg: Rgba,
+    pub search_highlight_bg: Rgba,
     pub directory: Rgb,
     pub header_bg: Rgba,
     pub status_bg: Rgba,
     pub border: Rgba,
     pub border_focused: Rgba,
     pub icon_folder: String,
+    pub icon_folder_open: String,
     pub icon_file: String,
 }
 
@@ -128,12 +134,14 @@ impl Default for Theme {
             foreground: Rgb::new(220, 220, 220),
             cursor_bg: Rgba::new(60, 60, 80, 255),
             selection_bg: Rgba::new(80, 60, 60, 255),
+            search_highlight_bg: Rgba::new(180, 180, 0, 100),  // Yellow highlight
             directory: Rgb::new(138, 79, 255),  // Royal purple
             header_bg: Rgba::new(40, 40, 50, 255),
             status_bg: Rgba::new(50, 50, 60, 255),
             border: Rgba::new(80, 80, 100, 255),
             border_focused: Rgba::new(100, 150, 255, 255),
             icon_folder: "\u{f07b}".to_string(),  //
+            icon_folder_open: "\u{f07c}".to_string(),  //
             icon_file: "\u{f15b}".to_string(),    //
         }
     }
@@ -237,6 +245,11 @@ impl Theme {
                 theme.selection_bg = Rgba::new(r, g, b, a);
             }
         }
+        if let Some(s) = get_str(&config, "search_highlight_bg").await {
+            if let Some((r, g, b, a)) = parse_rgba(&s) {
+                theme.search_highlight_bg = Rgba::new(r, g, b, a);
+            }
+        }
         if let Some(s) = get_str(&config, "directory").await {
             if let Some((r, g, b)) = parse_rgb(&s) {
                 theme.directory = Rgb::new(r, g, b);
@@ -266,6 +279,9 @@ impl Theme {
         // Load icons
         if let Some(s) = get_str(&config, "icon_folder").await {
             theme.icon_folder = s;
+        }
+        if let Some(s) = get_str(&config, "icon_folder_open").await {
+            theme.icon_folder_open = s;
         }
         if let Some(s) = get_str(&config, "icon_file").await {
             theme.icon_file = s;
@@ -372,6 +388,11 @@ impl Config {
 
     pub async fn theme(&self) -> Option<String> {
         self.get_str("theme").await
+    }
+
+    /// Whether vim keybindings are enabled (default: false for accessibility)
+    pub async fn vi_mode(&self) -> bool {
+        self.get_bool("vi").await.unwrap_or(false)
     }
 
     pub async fn overlay(&self) -> OverlayConfig {

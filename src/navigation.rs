@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 use crate::filesystem::{self, Entry, ArchiveEntry};
 use crate::input::SortMode;
@@ -16,6 +17,8 @@ pub struct Browser {
     archive_path: Option<PathBuf>,  // The archive file being browsed
     archive_prefix: String,         // Current path within the archive
     archive_entries: Vec<ArchiveEntry>, // All entries in the archive
+    // Inline expansion (fold) state
+    expanded_dirs: HashSet<PathBuf>,  // Directories that are expanded inline
 }
 
 impl Browser {
@@ -42,6 +45,7 @@ impl Browser {
             archive_path: None,
             archive_prefix: String::new(),
             archive_entries: Vec::new(),
+            expanded_dirs: HashSet::new(),
         };
         browser.refresh();
         browser
@@ -93,6 +97,7 @@ impl Browser {
                 is_dir: true,
                 size: 0,
                 modified: None,
+                depth: 0,
             });
         }
 
@@ -134,6 +139,7 @@ impl Browser {
                         is_dir: true,
                         size: 0,
                         modified: None,
+                        depth: 0,
                     });
                 }
             } else if entry.is_dir {
@@ -144,6 +150,7 @@ impl Browser {
                         is_dir: true,
                         size: entry.size,
                         modified: None,
+                        depth: 0,
                     });
                 }
             } else {
@@ -153,6 +160,7 @@ impl Browser {
                     is_dir: false,
                     size: entry.size,
                     modified: None,
+                    depth: 0,
                 });
             }
         }
@@ -448,6 +456,150 @@ impl Browser {
         self.sort_reverse = reverse;
         self.refresh();
     }
+
+    // ==================== Fold (inline expansion) methods ====================
+
+    /// Check if a directory is expanded
+    pub fn is_expanded(&self, path: &PathBuf) -> bool {
+        self.expanded_dirs.contains(path)
+    }
+
+    /// Expand a directory inline at the given index
+    pub fn expand_directory(&mut self, index: usize, recursive: bool) {
+        let Some(entry) = self.entries.get(index).cloned() else { return };
+        if !entry.is_dir || entry.name == ".." { return; }
+        if self.expanded_dirs.contains(&entry.path) { return; }
+
+        self.expanded_dirs.insert(entry.path.clone());
+
+        // Load children entries
+        let children = self.load_children(&entry.path, entry.depth + 1);
+
+        // Insert children after the parent entry
+        let insert_pos = index + 1;
+        for (i, child) in children.into_iter().enumerate() {
+            if recursive && child.is_dir && child.name != ".." {
+                // Mark for recursive expansion (will be expanded in next pass)
+                self.expanded_dirs.insert(child.path.clone());
+            }
+            self.entries.insert(insert_pos + i, child);
+        }
+
+        // If recursive, expand all newly added directories
+        if recursive {
+            self.rebuild_with_expansions();
+        }
+    }
+
+    /// Collapse a directory at the given index
+    pub fn collapse_directory(&mut self, index: usize, recursive: bool) {
+        let Some(entry) = self.entries.get(index).cloned() else { return };
+        if !entry.is_dir || entry.name == ".." { return; }
+        if !self.expanded_dirs.contains(&entry.path) { return; }
+
+        // Find range of children to remove
+        let range = self.find_children_range(index);
+
+        if recursive {
+            // Also remove from expanded_dirs any nested directories
+            for i in range.clone() {
+                if let Some(child) = self.entries.get(i) {
+                    if child.is_dir {
+                        self.expanded_dirs.remove(&child.path);
+                    }
+                }
+            }
+        }
+
+        self.expanded_dirs.remove(&entry.path);
+
+        // Remove children from entries
+        if !range.is_empty() {
+            self.entries.drain(range);
+        }
+
+        // Adjust cursor if needed
+        self.cursor = self.cursor.min(self.entries.len().saturating_sub(1));
+    }
+
+    /// Toggle expansion state of directory at index
+    pub fn toggle_expansion(&mut self, index: usize, recursive: bool) {
+        let Some(entry) = self.entries.get(index) else { return };
+        if !entry.is_dir || entry.name == ".." { return; }
+
+        if self.expanded_dirs.contains(&entry.path) {
+            self.collapse_directory(index, recursive);
+        } else {
+            self.expand_directory(index, recursive);
+        }
+    }
+
+    /// Find the range of children entries for a directory at index
+    fn find_children_range(&self, index: usize) -> std::ops::Range<usize> {
+        let parent_depth = self.entries.get(index).map(|e| e.depth).unwrap_or(0);
+        let start = index + 1;
+
+        let end = self.entries[start..]
+            .iter()
+            .position(|e| e.depth <= parent_depth)
+            .map(|p| start + p)
+            .unwrap_or(self.entries.len());
+
+        start..end
+    }
+
+    /// Load children of a directory with specified depth
+    fn load_children(&self, dir_path: &PathBuf, depth: u8) -> Vec<Entry> {
+        let mut children = filesystem::list_directory(dir_path);
+
+        // Remove ".." entry and set depth
+        children.retain(|e| e.name != "..");
+        for entry in &mut children {
+            entry.depth = depth;
+        }
+
+        // Apply hidden filter
+        if !self.show_hidden {
+            children.retain(|e| !e.name.starts_with('.'));
+        }
+
+        // Apply sorting
+        Self::sort_entries_impl(&mut children, self.sort_mode, self.sort_reverse);
+
+        children
+    }
+
+    /// Rebuild entries respecting current expansion state
+    fn rebuild_with_expansions(&mut self) {
+        // Start with base directory entries
+        let mut new_entries = filesystem::list_directory(&self.path);
+
+        // Apply hidden filter
+        if !self.show_hidden {
+            new_entries.retain(|e| !e.name.starts_with('.') || (self.show_parent_entry && e.name == ".."));
+        }
+
+        // Apply sorting
+        Self::sort_entries_impl(&mut new_entries, self.sort_mode, self.sort_reverse);
+
+        // Recursively insert expanded directories
+        let mut i = 0;
+        while i < new_entries.len() {
+            let entry = &new_entries[i];
+            if entry.is_dir && entry.name != ".." && self.expanded_dirs.contains(&entry.path) {
+                let children = self.load_children(&entry.path, entry.depth + 1);
+                let insert_pos = i + 1;
+                for (j, child) in children.into_iter().enumerate() {
+                    new_entries.insert(insert_pos + j, child);
+                }
+            }
+            i += 1;
+        }
+
+        self.entries = new_entries.clone();
+        self.all_entries = new_entries;
+        self.cursor = self.cursor.min(self.entries.len().saturating_sub(1));
+    }
 }
 
 pub struct Clipboard {
@@ -557,5 +709,17 @@ impl Selection {
 
     pub fn is_empty(&self) -> bool {
         self.indices.is_empty()
+    }
+
+    pub fn remove(&mut self, index: usize) {
+        self.indices.retain(|&i| i != index);
+    }
+
+    pub fn toggle(&mut self, index: usize) {
+        if self.contains(index) {
+            self.remove(index);
+        } else {
+            self.add(index);
+        }
     }
 }

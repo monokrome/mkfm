@@ -11,6 +11,7 @@ pub struct Entry {
     pub is_dir: bool,
     pub size: u64,
     pub modified: Option<SystemTime>,
+    pub depth: u8,  // Indentation level for inline expansion (0 = root)
 }
 
 impl Entry {
@@ -22,7 +23,13 @@ impl Entry {
         let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
         let modified = metadata.and_then(|m| m.modified().ok());
 
-        Some(Self { name, path, is_dir, size, modified })
+        Some(Self { name, path, is_dir, size, modified, depth: 0 })
+    }
+
+    /// Create an entry with a specific depth (for inline expansion)
+    pub fn with_depth(mut self, depth: u8) -> Self {
+        self.depth = depth;
+        self
     }
 }
 
@@ -51,6 +58,7 @@ pub fn list_directory(path: &Path) -> Vec<Entry> {
             is_dir: true,
             size: 0,
             modified: None,
+            depth: 0,
         });
     }
 
