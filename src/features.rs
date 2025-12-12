@@ -18,7 +18,11 @@ impl Feature {
         }
     }
 
-    pub fn unavailable(name: &'static str, description: &'static str, reason: impl Into<String>) -> Self {
+    pub fn unavailable(
+        name: &'static str,
+        description: &'static str,
+        reason: impl Into<String>,
+    ) -> Self {
         Self {
             name,
             available: false,

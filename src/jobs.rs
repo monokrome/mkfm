@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tokio::sync::mpsc;
 
@@ -26,7 +26,7 @@ pub struct Job {
     pub kind: JobKind,
     pub description: String,
     pub status: JobStatus,
-    pub progress: Option<f32>,  // 0.0-1.0 for measurable, None for spinner
+    pub progress: Option<f32>, // 0.0-1.0 for measurable, None for spinner
     pub created_at: Instant,
     pub completed_at: Option<Instant>,
 }
@@ -35,21 +35,39 @@ impl Job {
     pub fn new(id: JobId, kind: JobKind) -> Self {
         let description = match &kind {
             JobKind::Copy { src, dest } => {
-                let src_name = src.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                let dest_name = dest.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let src_name = src
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let dest_name = dest
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 format!("Copy {} -> {}", src_name, dest_name)
             }
             JobKind::Move { src, dest } => {
-                let src_name = src.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                let dest_name = dest.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let src_name = src
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let dest_name = dest
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 format!("Move {} -> {}", src_name, dest_name)
             }
             JobKind::Trash { path } => {
-                let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 format!("Trash {}", name)
             }
             JobKind::Extract { archive, .. } => {
-                let name = archive.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let name = archive
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 format!("Extract {}", name)
             }
         };
@@ -184,10 +202,11 @@ impl JobQueue {
     pub fn clear_completed(&mut self, max_age_secs: u64) {
         let now = Instant::now();
         self.jobs.retain(|job| {
-            if let Some(completed) = job.completed_at {
-                if job.is_complete() && now.duration_since(completed).as_secs() > max_age_secs {
-                    return false;
-                }
+            if let Some(completed) = job.completed_at
+                && job.is_complete()
+                && now.duration_since(completed).as_secs() > max_age_secs
+            {
+                return false;
             }
             true
         });
@@ -214,14 +233,18 @@ pub async fn execute_job(id: JobId, kind: JobKind, tx: mpsc::Sender<JobUpdate>) 
     };
 
     match result {
-        Ok(()) => { let _ = tx.send(JobUpdate::Complete(id)).await; }
-        Err(e) => { let _ = tx.send(JobUpdate::Failed(id, e.to_string())).await; }
+        Ok(()) => {
+            let _ = tx.send(JobUpdate::Complete(id)).await;
+        }
+        Err(e) => {
+            let _ = tx.send(JobUpdate::Failed(id, e.to_string())).await;
+        }
     }
 }
 
 async fn copy_with_progress(
-    src: &PathBuf,
-    dest: &PathBuf,
+    src: &Path,
+    dest: &Path,
     id: JobId,
     tx: &mpsc::Sender<JobUpdate>,
 ) -> std::io::Result<()> {
@@ -230,11 +253,11 @@ async fn copy_with_progress(
 
     if src.is_dir() {
         // Directory copy - use blocking operation
-        let src = src.clone();
-        let dest = dest.clone();
+        let src = src.to_path_buf();
+        let dest = dest.to_path_buf();
         tokio::task::spawn_blocking(move || filesystem::copy_file(&src, &dest))
             .await
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))??;
+            .map_err(std::io::Error::other)??;
         Ok(())
     } else {
         // File copy with byte-level progress
@@ -245,18 +268,24 @@ async fn copy_with_progress(
         let mut dest_file = fs::File::create(dest).await?;
 
         let mut copied = 0u64;
-        let mut buffer = vec![0u8; 64 * 1024];  // 64KB buffer
+        let mut buffer = vec![0u8; 64 * 1024]; // 64KB buffer
         let mut last_progress = 0.0f32;
 
         loop {
             let n = src_file.read(&mut buffer).await?;
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
 
             dest_file.write_all(&buffer[..n]).await?;
             copied += n as u64;
 
             // Only send progress updates when significant change (>1%)
-            let progress = if total_bytes > 0 { copied as f32 / total_bytes as f32 } else { 1.0 };
+            let progress = if total_bytes > 0 {
+                copied as f32 / total_bytes as f32
+            } else {
+                1.0
+            };
             if progress - last_progress > 0.01 {
                 let _ = tx.send(JobUpdate::Progress(id, progress)).await;
                 last_progress = progress;
@@ -267,37 +296,37 @@ async fn copy_with_progress(
     }
 }
 
-async fn move_file(src: &PathBuf, dest: &PathBuf) -> std::io::Result<()> {
+async fn move_file(src: &Path, dest: &Path) -> std::io::Result<()> {
     // Try rename first (fast, same filesystem)
     match tokio::fs::rename(src, dest).await {
         Ok(()) => Ok(()),
         Err(_) => {
             // Fall back to copy + delete (cross-filesystem)
-            let src = src.clone();
-            let dest = dest.clone();
+            let src = src.to_path_buf();
+            let dest = dest.to_path_buf();
             tokio::task::spawn_blocking(move || {
                 filesystem::copy_file(&src, &dest)?;
                 filesystem::delete(&src)
             })
             .await
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+            .map_err(std::io::Error::other)?
         }
     }
 }
 
-async fn trash_file(path: &PathBuf) -> std::io::Result<()> {
-    let path = path.clone();
+async fn trash_file(path: &Path) -> std::io::Result<()> {
+    let path = path.to_path_buf();
     tokio::task::spawn_blocking(move || filesystem::trash(&path))
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+        .map_err(std::io::Error::other)?
 }
 
-async fn extract_archive(archive: &PathBuf, dest: &PathBuf) -> std::io::Result<()> {
-    let archive = archive.clone();
-    let dest = dest.clone();
+async fn extract_archive(archive: &Path, dest: &Path) -> std::io::Result<()> {
+    let archive = archive.to_path_buf();
+    let dest = dest.to_path_buf();
     tokio::task::spawn_blocking(move || filesystem::extract_archive(&archive, &dest))
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+        .map_err(std::io::Error::other)?
 }
 
 // ==================== Task List and Error List Panes ====================

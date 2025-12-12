@@ -126,20 +126,20 @@ pub enum Action {
 pub fn handle_normal_key(key: &str, pending: &str) -> Action {
     // Handle mark setting: m + any letter
     if pending == "m" {
-        if let Some(c) = key.chars().next() {
-            if c.is_ascii_alphabetic() {
-                return Action::SetMark(c);
-            }
+        if let Some(c) = key.chars().next()
+            && c.is_ascii_alphabetic()
+        {
+            return Action::SetMark(c);
         }
         return Action::None;
     }
 
     // Handle mark jumping: ' + any letter
     if pending == "'" {
-        if let Some(c) = key.chars().next() {
-            if c.is_ascii_alphabetic() {
-                return Action::JumpToMark(c);
-            }
+        if let Some(c) = key.chars().next()
+            && c.is_ascii_alphabetic()
+        {
+            return Action::JumpToMark(c);
         }
         return Action::None;
     }
@@ -195,8 +195,8 @@ pub fn handle_normal_key(key: &str, pending: &str) -> Action {
         ("", "C-w") => Action::Pending,
 
         // Bookmarks
-        ("", "m") => Action::Pending,  // Set mark
-        ("", "'") => Action::Pending,  // Jump to mark
+        ("", "m") => Action::Pending, // Set mark
+        ("", "'") => Action::Pending, // Jump to mark
 
         // Search
         (_, "/") => Action::EnterSearchMode,
@@ -256,13 +256,14 @@ fn handle_command_key(key: &str) -> Action {
     match key {
         "\u{1b}" => Action::CommandCancel,
         "\n" => Action::CommandExecute,
-        "\u{8}" => Action::CommandBackspace,  // Backspace
+        "\u{8}" => Action::CommandBackspace, // Backspace
         _ => {
             let mut chars = key.chars();
-            if let Some(c) = chars.next() {
-                if chars.next().is_none() && !c.is_control() {
-                    return Action::CommandAppend(c);
-                }
+            if let Some(c) = chars.next()
+                && chars.next().is_none()
+                && !c.is_control()
+            {
+                return Action::CommandAppend(c);
             }
             Action::None
         }
@@ -276,10 +277,11 @@ fn handle_search_key(key: &str) -> Action {
         "\u{8}" => Action::SearchBackspace,
         _ => {
             let mut chars = key.chars();
-            if let Some(c) = chars.next() {
-                if chars.next().is_none() && !c.is_control() {
-                    return Action::SearchAppend(c);
-                }
+            if let Some(c) = chars.next()
+                && chars.next().is_none()
+                && !c.is_control()
+            {
+                return Action::SearchAppend(c);
             }
             Action::None
         }
@@ -299,7 +301,7 @@ fn handle_normal_key_standard(key: &str) -> Action {
 
         // Enter and navigation
         "\n" | "Right" => Action::EnterDirectory,
-        "Left" | "\u{8}" => Action::ParentDirectory,  // Backspace
+        "Left" | "\u{8}" => Action::ParentDirectory, // Backspace
 
         // File operations
         "Delete" => Action::Trash,
@@ -313,8 +315,8 @@ fn handle_normal_key_standard(key: &str) -> Action {
         "S-F3" => Action::SearchPrev,
 
         // Misc
-        "F5" => Action::ParentDirectory,  // Refresh (re-enter current dir)
-        "\u{1b}" => Action::ClearSearchHighlight,  // Escape
+        "F5" => Action::ParentDirectory, // Refresh (re-enter current dir)
+        "\u{1b}" => Action::ClearSearchHighlight, // Escape
         "C-h" => Action::ToggleHidden,
         "F2" => Action::OpenFile,
         "F12" => Action::ToggleFeatureList,
@@ -361,8 +363,14 @@ mod tests {
         assert!(matches!(handle_normal_key("k", ""), Action::MoveCursor(-1)));
         assert!(matches!(handle_normal_key("G", ""), Action::CursorToBottom));
         assert!(matches!(handle_normal_key("l", ""), Action::EnterDirectory));
-        assert!(matches!(handle_normal_key("h", ""), Action::ParentDirectory));
-        assert!(matches!(handle_normal_key("-", ""), Action::ParentDirectory));
+        assert!(matches!(
+            handle_normal_key("h", ""),
+            Action::ParentDirectory
+        ));
+        assert!(matches!(
+            handle_normal_key("-", ""),
+            Action::ParentDirectory
+        ));
     }
 
     #[test]
@@ -383,7 +391,10 @@ mod tests {
     fn test_normal_mode_unimpaired_toggles() {
         // yo sequence for toggle
         assert!(matches!(handle_normal_key("o", "y"), Action::Pending));
-        assert!(matches!(handle_normal_key("o", "yo"), Action::ToggleOverlay));
+        assert!(matches!(
+            handle_normal_key("o", "yo"),
+            Action::ToggleOverlay
+        ));
         assert!(matches!(handle_normal_key("h", "yo"), Action::ToggleHidden));
     }
 
@@ -391,7 +402,10 @@ mod tests {
     fn test_normal_mode_unimpaired_enable() {
         assert!(matches!(handle_normal_key("[", ""), Action::Pending));
         assert!(matches!(handle_normal_key("o", "["), Action::Pending));
-        assert!(matches!(handle_normal_key("o", "[o"), Action::EnableOverlay));
+        assert!(matches!(
+            handle_normal_key("o", "[o"),
+            Action::EnableOverlay
+        ));
         assert!(matches!(handle_normal_key("h", "[o"), Action::EnableHidden));
     }
 
@@ -399,8 +413,14 @@ mod tests {
     fn test_normal_mode_unimpaired_disable() {
         assert!(matches!(handle_normal_key("]", ""), Action::Pending));
         assert!(matches!(handle_normal_key("o", "]"), Action::Pending));
-        assert!(matches!(handle_normal_key("o", "]o"), Action::DisableOverlay));
-        assert!(matches!(handle_normal_key("h", "]o"), Action::DisableHidden));
+        assert!(matches!(
+            handle_normal_key("o", "]o"),
+            Action::DisableOverlay
+        ));
+        assert!(matches!(
+            handle_normal_key("h", "]o"),
+            Action::DisableHidden
+        ));
     }
 
     #[test]
@@ -416,8 +436,14 @@ mod tests {
         assert!(matches!(handle_normal_key("j", "C-w"), Action::FocusDown));
         assert!(matches!(handle_normal_key("k", "C-w"), Action::FocusUp));
         assert!(matches!(handle_normal_key("l", "C-w"), Action::FocusRight));
-        assert!(matches!(handle_normal_key("v", "C-w"), Action::SplitVertical));
-        assert!(matches!(handle_normal_key("s", "C-w"), Action::SplitHorizontal));
+        assert!(matches!(
+            handle_normal_key("v", "C-w"),
+            Action::SplitVertical
+        ));
+        assert!(matches!(
+            handle_normal_key("s", "C-w"),
+            Action::SplitHorizontal
+        ));
         assert!(matches!(handle_normal_key("c", "C-w"), Action::CloseSplit));
         assert!(matches!(handle_normal_key("q", "C-w"), Action::CloseSplit));
     }
@@ -428,8 +454,14 @@ mod tests {
         assert!(matches!(handle_normal_key("p", ""), Action::Paste));
         assert!(matches!(handle_normal_key("x", ""), Action::Delete));
         assert!(matches!(handle_normal_key(".", ""), Action::ToggleHidden));
-        assert!(matches!(handle_normal_key(":", ""), Action::EnterCommandMode));
-        assert!(matches!(handle_normal_key("v", ""), Action::EnterVisualMode));
+        assert!(matches!(
+            handle_normal_key(":", ""),
+            Action::EnterCommandMode
+        ));
+        assert!(matches!(
+            handle_normal_key("v", ""),
+            Action::EnterVisualMode
+        ));
         assert!(matches!(handle_normal_key("=", ""), Action::OpenFile));
     }
 
@@ -439,15 +471,24 @@ mod tests {
         assert!(matches!(handle_visual_key("k"), Action::MoveCursor(-1)));
         assert!(matches!(handle_visual_key("y"), Action::Yank));
         assert!(matches!(handle_visual_key("d"), Action::Cut));
-        assert!(matches!(handle_visual_key("\u{1b}"), Action::ExitVisualMode));
+        assert!(matches!(
+            handle_visual_key("\u{1b}"),
+            Action::ExitVisualMode
+        ));
         assert!(matches!(handle_visual_key("v"), Action::ExitVisualMode));
     }
 
     #[test]
     fn test_command_mode() {
-        assert!(matches!(handle_command_key("\u{1b}"), Action::CommandCancel));
+        assert!(matches!(
+            handle_command_key("\u{1b}"),
+            Action::CommandCancel
+        ));
         assert!(matches!(handle_command_key("\n"), Action::CommandExecute));
-        assert!(matches!(handle_command_key("\u{8}"), Action::CommandBackspace));
+        assert!(matches!(
+            handle_command_key("\u{8}"),
+            Action::CommandBackspace
+        ));
     }
 
     #[test]
@@ -469,23 +510,50 @@ mod tests {
     #[test]
     fn test_handle_key_dispatches_correctly() {
         // Vim mode
-        assert!(matches!(handle_key(Mode::Normal, "j", "", true), Action::MoveCursor(1)));
-        assert!(matches!(handle_key(Mode::Visual, "y", "", true), Action::Yank));
-        assert!(matches!(handle_key(Mode::Command, "\n", "", true), Action::CommandExecute));
-        assert!(matches!(handle_key(Mode::Search, "\n", "", true), Action::SearchExecute));
+        assert!(matches!(
+            handle_key(Mode::Normal, "j", "", true),
+            Action::MoveCursor(1)
+        ));
+        assert!(matches!(
+            handle_key(Mode::Visual, "y", "", true),
+            Action::Yank
+        ));
+        assert!(matches!(
+            handle_key(Mode::Command, "\n", "", true),
+            Action::CommandExecute
+        ));
+        assert!(matches!(
+            handle_key(Mode::Search, "\n", "", true),
+            Action::SearchExecute
+        ));
 
         // Standard mode
-        assert!(matches!(handle_key(Mode::Normal, "Down", "", false), Action::MoveCursor(1)));
-        assert!(matches!(handle_key(Mode::Normal, "Up", "", false), Action::MoveCursor(-1)));
-        assert!(matches!(handle_key(Mode::Normal, "C-c", "", false), Action::Yank));
-        assert!(matches!(handle_key(Mode::Normal, "C-v", "", false), Action::Paste));
+        assert!(matches!(
+            handle_key(Mode::Normal, "Down", "", false),
+            Action::MoveCursor(1)
+        ));
+        assert!(matches!(
+            handle_key(Mode::Normal, "Up", "", false),
+            Action::MoveCursor(-1)
+        ));
+        assert!(matches!(
+            handle_key(Mode::Normal, "C-c", "", false),
+            Action::Yank
+        ));
+        assert!(matches!(
+            handle_key(Mode::Normal, "C-v", "", false),
+            Action::Paste
+        ));
     }
 
     #[test]
     fn test_search_mode() {
         assert!(matches!(handle_search_key("\u{1b}"), Action::SearchCancel));
         assert!(matches!(handle_search_key("\n"), Action::SearchExecute));
-        assert!(matches!(handle_search_key("\u{8}"), Action::SearchBackspace));
+        assert!(matches!(
+            handle_search_key("\u{8}"),
+            Action::SearchBackspace
+        ));
         match handle_search_key("a") {
             Action::SearchAppend(c) => assert_eq!(c, 'a'),
             _ => panic!("expected SearchAppend"),
@@ -494,10 +562,16 @@ mod tests {
 
     #[test]
     fn test_normal_mode_search() {
-        assert!(matches!(handle_normal_key("/", ""), Action::EnterSearchMode));
+        assert!(matches!(
+            handle_normal_key("/", ""),
+            Action::EnterSearchMode
+        ));
         assert!(matches!(handle_normal_key("n", ""), Action::SearchNext));
         assert!(matches!(handle_normal_key("N", ""), Action::SearchPrev));
-        assert!(matches!(handle_normal_key("C-l", ""), Action::ClearSearchHighlight));
+        assert!(matches!(
+            handle_normal_key("C-l", ""),
+            Action::ClearSearchHighlight
+        ));
     }
 
     #[test]
@@ -539,7 +613,13 @@ mod tests {
         assert!(matches!(handle_normal_key("o", "z"), Action::FoldOpen));
         assert!(matches!(handle_normal_key("c", "z"), Action::FoldClose));
         assert!(matches!(handle_normal_key("a", "z"), Action::FoldToggle));
-        assert!(matches!(handle_normal_key("O", "z"), Action::FoldOpenRecursive));
-        assert!(matches!(handle_normal_key("C", "z"), Action::FoldCloseRecursive));
+        assert!(matches!(
+            handle_normal_key("O", "z"),
+            Action::FoldOpenRecursive
+        ));
+        assert!(matches!(
+            handle_normal_key("C", "z"),
+            Action::FoldCloseRecursive
+        ));
     }
 }

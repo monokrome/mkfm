@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod config;
 mod features;
 mod filesystem;
@@ -5,14 +7,17 @@ mod input;
 mod jobs;
 mod navigation;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use config::{Config, Openers, OverlayPosition, SavedSettings, Theme};
-use libc;
 use image::GenericImageView;
 
 enum PreviewContent {
-    Image { data: Vec<u8>, width: u32, height: u32 },
+    Image {
+        data: Vec<u8>,
+        width: u32,
+        height: u32,
+    },
     Text(Vec<String>),
     Unsupported(String),
     Error(String),
@@ -84,7 +89,10 @@ fn load_preview_content(path: &std::path::Path, max_width: u32, max_height: u32)
             Err(e) => PreviewContent::Error(format!("Read failed: {}", e)),
         }
     } else {
-        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("Unknown");
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Unknown");
         PreviewContent::Unsupported(filename.to_string())
     }
 }
@@ -96,23 +104,37 @@ struct PreviewCache {
 
 impl PreviewCache {
     fn new() -> Self {
-        Self { path: None, content: None }
+        Self {
+            path: None,
+            content: None,
+        }
     }
 
-    fn get_or_load(&mut self, path: &std::path::Path, max_width: u32, max_height: u32) -> &PreviewContent {
-        if self.path.as_ref().map(|p| p.as_path()) != Some(path) {
+    fn get_or_load(
+        &mut self,
+        path: &std::path::Path,
+        max_width: u32,
+        max_height: u32,
+    ) -> &PreviewContent {
+        if self.path.as_deref() != Some(path) {
             self.path = Some(path.to_path_buf());
             self.content = Some(self.load_content(path, max_width, max_height));
         }
         self.content.as_ref().unwrap()
     }
 
-    fn load_content(&mut self, path: &std::path::Path, max_width: u32, max_height: u32) -> PreviewContent {
+    fn load_content(
+        &mut self,
+        path: &std::path::Path,
+        max_width: u32,
+        max_height: u32,
+    ) -> PreviewContent {
         // Copy path to owned value for catch_unwind
         let path_owned = path.to_path_buf();
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
             load_preview_content(&path_owned, max_width, max_height)
-        })).unwrap_or_else(|_| PreviewContent::Error("Preview crashed".to_string()))
+        }))
+        .unwrap_or_else(|_| PreviewContent::Error("Preview crashed".to_string()))
     }
 
     fn invalidate(&mut self) {
@@ -120,14 +142,14 @@ impl PreviewCache {
         self.content = None;
     }
 }
-use std::collections::HashMap;
 use input::{Action, Mode, SortMode, handle_key};
 use navigation::{Browser, Clipboard, Selection};
+use std::collections::HashMap;
 
 use mkframe::{
     App as MkApp, AttachedAnchor, AttachedSurfaceId, Canvas, Color, HAlign, KeyState,
-    PointerButton, PointerEvent, PointerEventKind,
-    Rect, SplitDirection, SplitTree, SubsurfaceId, TextColor, TextRenderer, VAlign,
+    PointerButton, PointerEvent, PointerEventKind, Rect, SplitDirection, SplitTree, SubsurfaceId,
+    TextColor, TextRenderer, VAlign,
 };
 
 enum CommandResult {
@@ -157,7 +179,7 @@ struct App {
     pending_keys: String,
     overlay_enabled: bool,
     motion_count: Option<usize>,
-    pending_theme: Option<Option<String>>,  // Some(None) = default, Some(Some(x)) = named theme
+    pending_theme: Option<Option<String>>, // Some(None) = default, Some(Some(x)) = named theme
     should_exit: bool,
     openers: Openers,
     // Search
@@ -309,8 +331,14 @@ impl App {
         ));
 
         // Archive support - check if tools are available
-        let has_tar = std::process::Command::new("tar").arg("--version").output().is_ok();
-        let has_unzip = std::process::Command::new("unzip").arg("-v").output().is_ok();
+        let has_tar = std::process::Command::new("tar")
+            .arg("--version")
+            .output()
+            .is_ok();
+        let has_unzip = std::process::Command::new("unzip")
+            .arg("-v")
+            .output()
+            .is_ok();
         if has_tar || has_unzip {
             self.feature_list.add(Feature::available(
                 FEATURE_ARCHIVE,
@@ -325,8 +353,14 @@ impl App {
         }
 
         // Trash support - check for trash-cli or gio
-        let has_trash = std::process::Command::new("trash-put").arg("--version").output().is_ok()
-            || std::process::Command::new("gio").arg("help").output().is_ok();
+        let has_trash = std::process::Command::new("trash-put")
+            .arg("--version")
+            .output()
+            .is_ok()
+            || std::process::Command::new("gio")
+                .arg("help")
+                .output()
+                .is_ok();
         if has_trash {
             self.feature_list.add(Feature::available(
                 FEATURE_TRASH,
@@ -374,7 +408,9 @@ impl App {
             if let Some(browser) = self.browser() {
                 let files: Vec<PathBuf> = if self.selection.is_empty() {
                     // Drag cursor item
-                    browser.entries.get(browser.cursor)
+                    browser
+                        .entries
+                        .get(browser.cursor)
                         .map(|e| vec![e.path.clone()])
                         .unwrap_or_default()
                 } else {
@@ -394,15 +430,15 @@ impl App {
 
     fn process_key(&mut self, key_str: &str) -> bool {
         // In Normal/Visual mode, accumulate digits for motion count
-        if self.mode == Mode::Normal || self.mode == Mode::Visual {
-            if let Some(digit) = key_str.chars().next().filter(|c| c.is_ascii_digit()) {
-                let d = digit.to_digit(10).unwrap() as usize;
-                // Don't start count with 0 (0 could be a motion like go-to-start)
-                if self.motion_count.is_some() || d != 0 {
-                    let current = self.motion_count.unwrap_or(0);
-                    self.motion_count = Some(current * 10 + d);
-                    return false;
-                }
+        if (self.mode == Mode::Normal || self.mode == Mode::Visual)
+            && let Some(digit) = key_str.chars().next().filter(|c| c.is_ascii_digit())
+        {
+            let d = digit.to_digit(10).unwrap() as usize;
+            // Don't start count with 0 (0 could be a motion like go-to-start)
+            if self.motion_count.is_some() || d != 0 {
+                let current = self.motion_count.unwrap_or(0);
+                self.motion_count = Some(current * 10 + d);
+                return false;
             }
         }
 
@@ -456,7 +492,8 @@ impl App {
         } else {
             0
         };
-        let main_content_height = window_height.saturating_sub(status_height as u32 + list_pane_height);
+        let main_content_height =
+            window_height.saturating_sub(status_height as u32 + list_pane_height);
 
         match &event.kind {
             PointerEventKind::Press(PointerButton::Left) => {
@@ -477,7 +514,7 @@ impl App {
                         self.focus_area = FocusArea::Splits;
 
                         // Calculate entry index from y position
-                        let inner_y = pane_rect.y + 1;  // 1px border
+                        let inner_y = pane_rect.y + 1; // 1px border
                         let list_top = inner_y + header_height;
                         let list_height = (pane_rect.height as i32 - 2 - header_height).max(0);
                         let visible_lines = (list_height / line_height).max(0) as usize;
@@ -489,24 +526,28 @@ impl App {
 
                             // Get scroll offset from browser
                             if let Some(browser) = self.splits.get_mut(leaf_id) {
-                                let scroll_offset = if browser.cursor >= visible_lines && visible_lines > 0 {
-                                    browser.cursor - visible_lines + 1
-                                } else {
-                                    0
-                                };
+                                let scroll_offset =
+                                    if browser.cursor >= visible_lines && visible_lines > 0 {
+                                        browser.cursor - visible_lines + 1
+                                    } else {
+                                        0
+                                    };
 
                                 let entry_index = scroll_offset + visual_index;
                                 if entry_index < browser.entries.len() {
                                     // Check for double-click
                                     let now = std::time::Instant::now();
-                                    let double_click_threshold = std::time::Duration::from_millis(400);
+                                    let double_click_threshold =
+                                        std::time::Duration::from_millis(400);
                                     let distance_threshold = 5.0;
 
                                     let is_double_click = {
-                                        let time_ok = now.duration_since(self.last_click_time) < double_click_threshold;
+                                        let time_ok = now.duration_since(self.last_click_time)
+                                            < double_click_threshold;
                                         let dx = (x - self.last_click_pos.0).abs();
                                         let dy = (y - self.last_click_pos.1).abs();
-                                        let pos_ok = dx < distance_threshold && dy < distance_threshold;
+                                        let pos_ok =
+                                            dx < distance_threshold && dy < distance_threshold;
                                         time_ok && pos_ok
                                     };
 
@@ -546,17 +587,17 @@ impl App {
             }
             PointerEventKind::Motion => {
                 // Check if we should start a drag
-                if let Some((start_x, start_y)) = self.drag_start_pos {
-                    if !self.dragging {
-                        let drag_threshold = 8.0;
-                        let dx = (event.x - start_x).abs();
-                        let dy = (event.y - start_y).abs();
-                        let distance = (dx * dx + dy * dy).sqrt();
+                if let Some((start_x, start_y)) = self.drag_start_pos
+                    && !self.dragging
+                {
+                    let drag_threshold = 8.0;
+                    let dx = (event.x - start_x).abs();
+                    let dy = (event.y - start_y).abs();
+                    let distance = (dx * dx + dy * dy).sqrt();
 
-                        if distance > drag_threshold {
-                            // Mark as dragging - main loop will initiate the actual drag
-                            self.dragging = true;
-                        }
+                    if distance > drag_threshold {
+                        // Mark as dragging - main loop will initiate the actual drag
+                        self.dragging = true;
                     }
                 }
             }
@@ -610,10 +651,10 @@ impl App {
                     } else {
                         None
                     };
-                    if self.mode == Mode::Visual {
-                        if let Some(c) = cursor {
-                            self.selection.add(c);
-                        }
+                    if self.mode == Mode::Visual
+                        && let Some(c) = cursor
+                    {
+                        self.selection.add(c);
                     }
                 }
                 true
@@ -675,7 +716,8 @@ impl App {
                 } else {
                     // Normal mode: open current file
                     if let Some(browser) = self.browser() {
-                        browser.current_entry()
+                        browser
+                            .current_entry()
                             .filter(|e| !e.is_dir)
                             .map(|e| vec![e.path.clone()])
                             .unwrap_or_default()
@@ -766,13 +808,17 @@ impl App {
                 if let Some(browser) = self.browser() {
                     if browser.in_archive() {
                         // Yank from archive: store archive path and internal paths
-                        if let Some(archive_path) = browser.get_archive_path().cloned() {
+                        if let Some(archive_path) =
+                            browser.get_archive_path().map(Path::to_path_buf)
+                        {
                             let file_paths: Vec<String> = if self.selection.is_empty() {
-                                browser.current_entry()
+                                browser
+                                    .current_entry()
                                     .map(|e| vec![e.path.to_string_lossy().to_string()])
                                     .unwrap_or_default()
                             } else {
-                                self.selection.to_paths(&browser.entries)
+                                self.selection
+                                    .to_paths(&browser.entries)
                                     .iter()
                                     .map(|p| p.to_string_lossy().to_string())
                                     .collect()
@@ -806,13 +852,21 @@ impl App {
                     } else {
                         // Submit copy/move jobs for each clipboard path
                         for src in &self.clipboard.paths {
-                            let Some(name) = src.file_name() else { continue };
+                            let Some(name) = src.file_name() else {
+                                continue;
+                            };
                             let dest = dest_dir.join(name);
 
                             let kind = if self.clipboard.is_cut {
-                                jobs::JobKind::Move { src: src.clone(), dest }
+                                jobs::JobKind::Move {
+                                    src: src.clone(),
+                                    dest,
+                                }
                             } else {
-                                jobs::JobKind::Copy { src: src.clone(), dest }
+                                jobs::JobKind::Copy {
+                                    src: src.clone(),
+                                    dest,
+                                }
                             };
 
                             let job_id = self.job_queue.submit(kind.clone());
@@ -834,10 +888,10 @@ impl App {
             }
 
             Action::Delete => {
-                if let Some(browser) = self.browser() {
-                    if let Some(entry) = browser.current_entry() {
-                        let _ = filesystem::delete(&entry.path);
-                    }
+                if let Some(browser) = self.browser()
+                    && let Some(entry) = browser.current_entry()
+                {
+                    let _ = filesystem::delete(&entry.path);
                 }
                 if let Some(browser) = self.browser_mut() {
                     browser.refresh();
@@ -853,19 +907,19 @@ impl App {
             }
 
             Action::EnableHidden => {
-                if let Some(browser) = self.browser_mut() {
-                    if !browser.show_hidden {
-                        browser.toggle_hidden();
-                    }
+                if let Some(browser) = self.browser_mut()
+                    && !browser.show_hidden
+                {
+                    browser.toggle_hidden();
                 }
                 true
             }
 
             Action::DisableHidden => {
-                if let Some(browser) = self.browser_mut() {
-                    if browser.show_hidden {
-                        browser.toggle_hidden();
-                    }
+                if let Some(browser) = self.browser_mut()
+                    && browser.show_hidden
+                {
+                    browser.toggle_hidden();
                 }
                 true
             }
@@ -991,10 +1045,14 @@ impl App {
                     // Set current_match to first match at or after cursor
                     if let Some(browser) = self.browser() {
                         let cursor = browser.cursor;
-                        self.current_match = self.search_matches
-                            .iter()
-                            .position(|&i| i >= cursor)
-                            .or_else(|| if self.search_matches.is_empty() { None } else { Some(0) });
+                        self.current_match =
+                            self.search_matches.iter().position(|&i| i >= cursor).or({
+                                if self.search_matches.is_empty() {
+                                    None
+                                } else {
+                                    Some(0)
+                                }
+                            });
                     }
                 }
                 self.mode = Mode::Normal;
@@ -1014,7 +1072,8 @@ impl App {
             Action::SearchNext => {
                 if self.search_highlight && !self.search_matches.is_empty() {
                     // Navigate using match indices
-                    let next = self.current_match
+                    let next = self
+                        .current_match
                         .map(|i| (i + 1) % self.search_matches.len())
                         .unwrap_or(0);
                     self.current_match = Some(next);
@@ -1034,8 +1093,15 @@ impl App {
             Action::SearchPrev => {
                 if self.search_highlight && !self.search_matches.is_empty() {
                     // Navigate using match indices
-                    let prev = self.current_match
-                        .map(|i| if i == 0 { self.search_matches.len() - 1 } else { i - 1 })
+                    let prev = self
+                        .current_match
+                        .map(|i| {
+                            if i == 0 {
+                                self.search_matches.len() - 1
+                            } else {
+                                i - 1
+                            }
+                        })
                         .unwrap_or(self.search_matches.len() - 1);
                     self.current_match = Some(prev);
                     let target_cursor = self.search_matches[prev];
@@ -1067,10 +1133,10 @@ impl App {
             }
 
             Action::JumpToMark(c) => {
-                if let Some(path) = self.bookmarks.get(&c).cloned() {
-                    if let Some(browser) = self.browser_mut() {
-                        browser.navigate_to(&path);
-                    }
+                if let Some(path) = self.bookmarks.get(&c).cloned()
+                    && let Some(browser) = self.browser_mut()
+                {
+                    browser.navigate_to(&path);
                 }
                 true
             }
@@ -1121,16 +1187,16 @@ impl App {
 
             // Archive action
             Action::ExtractArchive => {
-                if let Some(browser) = self.browser() {
-                    if let Some(entry) = browser.current_entry() {
-                        let kind = jobs::JobKind::Extract {
-                            archive: entry.path.clone(),
-                            dest: browser.path.clone(),
-                        };
-                        let job_id = self.job_queue.submit(kind.clone());
-                        let tx = self.job_queue.sender();
-                        self.runtime.spawn(jobs::execute_job(job_id, kind, tx));
-                    }
+                if let Some(browser) = self.browser()
+                    && let Some(entry) = browser.current_entry()
+                {
+                    let kind = jobs::JobKind::Extract {
+                        archive: entry.path.clone(),
+                        dest: browser.path.clone(),
+                    };
+                    let job_id = self.job_queue.submit(kind.clone());
+                    let tx = self.job_queue.sender();
+                    self.runtime.spawn(jobs::execute_job(job_id, kind, tx));
                 }
                 if let Some(browser) = self.browser_mut() {
                     browser.refresh();
@@ -1288,7 +1354,10 @@ impl App {
             let pattern_lower = pattern.to_lowercase();
             // Collect matches first to avoid borrow conflict
             let matches: Vec<usize> = if let Some(browser) = self.browser() {
-                browser.entries.iter().enumerate()
+                browser
+                    .entries
+                    .iter()
+                    .enumerate()
                     .filter(|(_, entry)| entry.name.to_lowercase().contains(&pattern_lower))
                     .map(|(i, _)| i)
                     .collect()
@@ -1310,7 +1379,8 @@ impl App {
     fn selected_paths(&self) -> Vec<std::path::PathBuf> {
         if let Some(browser) = self.browser() {
             if self.selection.is_empty() {
-                browser.current_entry()
+                browser
+                    .current_entry()
                     .map(|e| vec![e.path.clone()])
                     .unwrap_or_default()
             } else {
@@ -1337,7 +1407,10 @@ impl App {
         }
 
         // Handle :filter <pattern>
-        if let Some(pattern) = cmd.strip_prefix("filter ").or_else(|| cmd.strip_prefix("f ")) {
+        if let Some(pattern) = cmd
+            .strip_prefix("filter ")
+            .or_else(|| cmd.strip_prefix("f "))
+        {
             let pattern = pattern.trim();
             let filter = if pattern.is_empty() {
                 None
@@ -1374,10 +1447,10 @@ impl App {
         // Handle :chmod <mode>
         if let Some(mode) = cmd.strip_prefix("chmod ") {
             let mode = mode.trim();
-            if let Some(browser) = self.browser() {
-                if let Some(entry) = browser.current_entry() {
-                    let _ = filesystem::chmod(&entry.path, mode);
-                }
+            if let Some(browser) = self.browser()
+                && let Some(entry) = browser.current_entry()
+            {
+                let _ = filesystem::chmod(&entry.path, mode);
             }
             if let Some(browser) = self.browser_mut() {
                 browser.refresh();
@@ -1470,7 +1543,8 @@ impl App {
 
         // Create temp file with file names
         let temp_path = std::env::temp_dir().join("mkfm_rename.txt");
-        let names: Vec<String> = paths.iter()
+        let names: Vec<String> = paths
+            .iter()
             .filter_map(|p| p.file_name())
             .map(|n| n.to_string_lossy().to_string())
             .collect();
@@ -1483,9 +1557,7 @@ impl App {
         let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
 
         // Run editor (this will take over the terminal)
-        let status = std::process::Command::new(&editor)
-            .arg(&temp_path)
-            .status();
+        let status = std::process::Command::new(&editor).arg(&temp_path).status();
 
         if status.is_ok() {
             // Read new names
@@ -1518,16 +1590,13 @@ impl App {
         if let Some((key, value)) = arg.split_once('=') {
             let key = key.trim();
             let value = value.trim();
-            match key {
-                "theme" => {
-                    let theme_name = if value.is_empty() || value == "default" {
-                        None
-                    } else {
-                        Some(value.to_string())
-                    };
-                    return CommandResult::ThemeChange(theme_name);
-                }
-                _ => {}
+            if key == "theme" {
+                let theme_name = if value.is_empty() || value == "default" {
+                    None
+                } else {
+                    Some(value.to_string())
+                };
+                return CommandResult::ThemeChange(theme_name);
             }
             return CommandResult::Redraw;
         }
@@ -1542,9 +1611,9 @@ impl App {
         match option {
             "hidden" | "hid" => {
                 if let Some(browser) = self.browser_mut() {
-                    if negated && browser.show_hidden {
-                        browser.toggle_hidden();
-                    } else if !negated && !browser.show_hidden {
+                    // Toggle if current state doesn't match desired state
+                    // negated=true means "nohidden" (want false), negated=false means "hidden" (want true)
+                    if negated == browser.show_hidden {
                         browser.toggle_hidden();
                     }
                 }
@@ -1566,27 +1635,61 @@ impl App {
     }
 }
 
-
-fn render(
-    canvas: &mut Canvas,
-    text_renderer: &mut TextRenderer,
-    app: &App,
-    theme: &Theme,
-) {
+fn render(canvas: &mut Canvas, text_renderer: &mut TextRenderer, app: &App, theme: &Theme) {
     let width = canvas.width();
     let height = canvas.height();
 
     // Colors from theme
-    let bg_color = Color::from_rgba8(theme.background.r, theme.background.g, theme.background.b, theme.background.a);
+    let bg_color = Color::from_rgba8(
+        theme.background.r,
+        theme.background.g,
+        theme.background.b,
+        theme.background.a,
+    );
     let fg_color = TextColor::rgb(theme.foreground.r, theme.foreground.g, theme.foreground.b);
-    let cursor_bg = Color::from_rgba8(theme.cursor_bg.r, theme.cursor_bg.g, theme.cursor_bg.b, theme.cursor_bg.a);
-    let selected_bg = Color::from_rgba8(theme.selection_bg.r, theme.selection_bg.g, theme.selection_bg.b, theme.selection_bg.a);
-    let search_highlight_bg = Color::from_rgba8(theme.search_highlight_bg.r, theme.search_highlight_bg.g, theme.search_highlight_bg.b, theme.search_highlight_bg.a);
+    let cursor_bg = Color::from_rgba8(
+        theme.cursor_bg.r,
+        theme.cursor_bg.g,
+        theme.cursor_bg.b,
+        theme.cursor_bg.a,
+    );
+    let selected_bg = Color::from_rgba8(
+        theme.selection_bg.r,
+        theme.selection_bg.g,
+        theme.selection_bg.b,
+        theme.selection_bg.a,
+    );
+    let search_highlight_bg = Color::from_rgba8(
+        theme.search_highlight_bg.r,
+        theme.search_highlight_bg.g,
+        theme.search_highlight_bg.b,
+        theme.search_highlight_bg.a,
+    );
     let dir_color = TextColor::rgb(theme.directory.r, theme.directory.g, theme.directory.b);
-    let header_bg = Color::from_rgba8(theme.header_bg.r, theme.header_bg.g, theme.header_bg.b, theme.header_bg.a);
-    let status_bg = Color::from_rgba8(theme.status_bg.r, theme.status_bg.g, theme.status_bg.b, theme.status_bg.a);
-    let border_color = Color::from_rgba8(theme.border.r, theme.border.g, theme.border.b, theme.border.a);
-    let focused_border = Color::from_rgba8(theme.border_focused.r, theme.border_focused.g, theme.border_focused.b, theme.border_focused.a);
+    let header_bg = Color::from_rgba8(
+        theme.header_bg.r,
+        theme.header_bg.g,
+        theme.header_bg.b,
+        theme.header_bg.a,
+    );
+    let status_bg = Color::from_rgba8(
+        theme.status_bg.r,
+        theme.status_bg.g,
+        theme.status_bg.b,
+        theme.status_bg.a,
+    );
+    let border_color = Color::from_rgba8(
+        theme.border.r,
+        theme.border.g,
+        theme.border.b,
+        theme.border.a,
+    );
+    let focused_border = Color::from_rgba8(
+        theme.border_focused.r,
+        theme.border_focused.g,
+        theme.border_focused.b,
+        theme.border_focused.a,
+    );
 
     // Clear background
     canvas.clear(bg_color);
@@ -1600,133 +1703,187 @@ fn render(
     // Calculate task/error list pane height
     let list_pane_visible = app.task_list.visible || app.error_list.visible;
     let list_pane_height = if list_pane_visible {
-        (height as f32 * 0.20).round() as u32  // 20% of window height
+        (height as f32 * 0.20).round() as u32 // 20% of window height
     } else {
         0
     };
 
     // Main content height (minus status bar and list pane)
-    let main_content_height = height.saturating_sub(status_height as u32).saturating_sub(list_pane_height);
+    let main_content_height = height
+        .saturating_sub(status_height as u32)
+        .saturating_sub(list_pane_height);
 
     // Render each split pane
     let bounds = Rect::new(0, 0, width, main_content_height);
-    app.splits.render(bounds, |_leaf_id, pane_rect, browser, is_focused| {
-        let pane_x = pane_rect.x;
-        let pane_y = pane_rect.y;
-        let pane_w = pane_rect.width;
-        let pane_h = pane_rect.height;
+    app.splits
+        .render(bounds, |_leaf_id, pane_rect, browser, is_focused| {
+            let pane_x = pane_rect.x;
+            let pane_y = pane_rect.y;
+            let pane_w = pane_rect.width;
+            let pane_h = pane_rect.height;
 
-        // Draw border around pane (1px)
-        // Only show focused border if splits area has focus
-        let border = if is_focused && app.focus_area == FocusArea::Splits { focused_border } else { border_color };
-        canvas.fill_rect(pane_x as f32, pane_y as f32, pane_w as f32, 1.0, border);
-        canvas.fill_rect(pane_x as f32, (pane_y + pane_h as i32 - 1) as f32, pane_w as f32, 1.0, border);
-        canvas.fill_rect(pane_x as f32, pane_y as f32, 1.0, pane_h as f32, border);
-        canvas.fill_rect((pane_x + pane_w as i32 - 1) as f32, pane_y as f32, 1.0, pane_h as f32, border);
-
-        // Inner content area (inset by 1px border)
-        let inner_x = pane_x + 1;
-        let inner_y = pane_y + 1;
-        let inner_w = pane_w.saturating_sub(2);
-        let inner_h = pane_h.saturating_sub(2);
-
-        // Header bar with current path
-        canvas.fill_rect(inner_x as f32, inner_y as f32, inner_w as f32, header_height as f32, header_bg);
-        let header_text = if let Some(archive_path) = browser.get_archive_path() {
-            let prefix = browser.get_archive_prefix();
-            if prefix.is_empty() {
-                format!("[{}]", archive_path.to_string_lossy())
+            // Draw border around pane (1px)
+            // Only show focused border if splits area has focus
+            let border = if is_focused && app.focus_area == FocusArea::Splits {
+                focused_border
             } else {
-                format!("[{}]/{}", archive_path.to_string_lossy(), prefix)
-            }
-        } else {
-            browser.path.to_string_lossy().to_string()
-        };
-        text_renderer.draw_text_in_rect(
-            canvas,
-            &header_text,
-            Rect::new(inner_x + padding, inner_y, inner_w - padding as u32 * 2, header_height as u32),
-            font_size,
-            fg_color,
-            HAlign::Left,
-            VAlign::Center,
-        );
+                border_color
+            };
+            canvas.fill_rect(pane_x as f32, pane_y as f32, pane_w as f32, 1.0, border);
+            canvas.fill_rect(
+                pane_x as f32,
+                (pane_y + pane_h as i32 - 1) as f32,
+                pane_w as f32,
+                1.0,
+                border,
+            );
+            canvas.fill_rect(pane_x as f32, pane_y as f32, 1.0, pane_h as f32, border);
+            canvas.fill_rect(
+                (pane_x + pane_w as i32 - 1) as f32,
+                pane_y as f32,
+                1.0,
+                pane_h as f32,
+                border,
+            );
 
-        // File list area
-        let list_top = inner_y + header_height;
-        let list_height = inner_h as i32 - header_height;
-        let visible_lines = (list_height / line_height).max(0) as usize;
+            // Inner content area (inset by 1px border)
+            let inner_x = pane_x + 1;
+            let inner_y = pane_y + 1;
+            let inner_w = pane_w.saturating_sub(2);
+            let inner_h = pane_h.saturating_sub(2);
 
-        // Calculate scroll offset to keep cursor visible
-        let scroll_offset = if browser.cursor >= visible_lines && visible_lines > 0 {
-            browser.cursor - visible_lines + 1
-        } else {
-            0
-        };
-
-        // Draw file entries
-        for (i, entry) in browser.entries.iter().enumerate().skip(scroll_offset).take(visible_lines) {
-            let y = list_top + ((i - scroll_offset) as i32 * line_height);
-            let is_cursor = i == browser.cursor;
-            let is_selected = app.selection.contains(i);
-            let is_search_match = app.search_highlight && app.search_matches.contains(&i);
-
-            // Background priority: cursor > search_match > selection
-            if is_cursor {
-                canvas.fill_rect(inner_x as f32, y as f32, inner_w as f32, line_height as f32, cursor_bg);
-            } else if is_search_match {
-                canvas.fill_rect(inner_x as f32, y as f32, inner_w as f32, line_height as f32, search_highlight_bg);
-            } else if is_selected {
-                canvas.fill_rect(inner_x as f32, y as f32, inner_w as f32, line_height as f32, selected_bg);
-            }
-
-            // Calculate indentation based on depth
-            let indent = entry.depth as i32 * 16;  // 16px per level
-
-            // File/directory icon and name (using nerd font icons)
-            let icon = if entry.is_dir {
-                if entry.name != ".." && browser.is_expanded(&entry.path) {
-                    &theme.icon_folder_open
+            // Header bar with current path
+            canvas.fill_rect(
+                inner_x as f32,
+                inner_y as f32,
+                inner_w as f32,
+                header_height as f32,
+                header_bg,
+            );
+            let header_text = if let Some(archive_path) = browser.get_archive_path() {
+                let prefix = browser.get_archive_prefix();
+                if prefix.is_empty() {
+                    format!("[{}]", archive_path.to_string_lossy())
                 } else {
-                    &theme.icon_folder
+                    format!("[{}]/{}", archive_path.to_string_lossy(), prefix)
                 }
             } else {
-                &theme.icon_file
+                browser.path.to_string_lossy().to_string()
             };
-            let display = format!("{} {}", icon, entry.name);
-            let color = if entry.is_dir { dir_color } else { fg_color };
-
-            let row_rect = Rect::new(
-                inner_x + padding + indent,
-                y,
-                (inner_w as i32 - padding as i32 * 2 - indent).max(0) as u32,
-                line_height as u32
-            );
             text_renderer.draw_text_in_rect(
                 canvas,
-                &display,
-                row_rect,
+                &header_text,
+                Rect::new(
+                    inner_x + padding,
+                    inner_y,
+                    inner_w - padding as u32 * 2,
+                    header_height as u32,
+                ),
                 font_size,
-                color,
+                fg_color,
                 HAlign::Left,
                 VAlign::Center,
             );
 
-            // Size for files (right-aligned)
-            if !entry.is_dir {
-                let size_str = filesystem::format_size(entry.size);
+            // File list area
+            let list_top = inner_y + header_height;
+            let list_height = inner_h as i32 - header_height;
+            let visible_lines = (list_height / line_height).max(0) as usize;
+
+            // Calculate scroll offset to keep cursor visible
+            let scroll_offset = if browser.cursor >= visible_lines && visible_lines > 0 {
+                browser.cursor - visible_lines + 1
+            } else {
+                0
+            };
+
+            // Draw file entries
+            for (i, entry) in browser
+                .entries
+                .iter()
+                .enumerate()
+                .skip(scroll_offset)
+                .take(visible_lines)
+            {
+                let y = list_top + ((i - scroll_offset) as i32 * line_height);
+                let is_cursor = i == browser.cursor;
+                let is_selected = app.selection.contains(i);
+                let is_search_match = app.search_highlight && app.search_matches.contains(&i);
+
+                // Background priority: cursor > search_match > selection
+                if is_cursor {
+                    canvas.fill_rect(
+                        inner_x as f32,
+                        y as f32,
+                        inner_w as f32,
+                        line_height as f32,
+                        cursor_bg,
+                    );
+                } else if is_search_match {
+                    canvas.fill_rect(
+                        inner_x as f32,
+                        y as f32,
+                        inner_w as f32,
+                        line_height as f32,
+                        search_highlight_bg,
+                    );
+                } else if is_selected {
+                    canvas.fill_rect(
+                        inner_x as f32,
+                        y as f32,
+                        inner_w as f32,
+                        line_height as f32,
+                        selected_bg,
+                    );
+                }
+
+                // Calculate indentation based on depth
+                let indent = entry.depth as i32 * 16; // 16px per level
+
+                // File/directory icon and name (using nerd font icons)
+                let icon = if entry.is_dir {
+                    if entry.name != ".." && browser.is_expanded(&entry.path) {
+                        &theme.icon_folder_open
+                    } else {
+                        &theme.icon_folder
+                    }
+                } else {
+                    &theme.icon_file
+                };
+                let display = format!("{} {}", icon, entry.name);
+                let color = if entry.is_dir { dir_color } else { fg_color };
+
+                let row_rect = Rect::new(
+                    inner_x + padding + indent,
+                    y,
+                    (inner_w as i32 - padding * 2 - indent).max(0) as u32,
+                    line_height as u32,
+                );
                 text_renderer.draw_text_in_rect(
                     canvas,
-                    &size_str,
+                    &display,
                     row_rect,
                     font_size,
-                    fg_color,
-                    HAlign::Right,
+                    color,
+                    HAlign::Left,
                     VAlign::Center,
                 );
+
+                // Size for files (right-aligned)
+                if !entry.is_dir {
+                    let size_str = filesystem::format_size(entry.size);
+                    text_renderer.draw_text_in_rect(
+                        canvas,
+                        &size_str,
+                        row_rect,
+                        font_size,
+                        fg_color,
+                        HAlign::Right,
+                        VAlign::Center,
+                    );
+                }
             }
-        }
-    });
+        });
 
     // Render task/error list pane if visible
     if list_pane_visible {
@@ -1735,11 +1892,27 @@ fn render(
         let list_pane_h = list_pane_height;
 
         // Draw border at top (highlighted if focused)
-        let list_border = if app.focus_area == FocusArea::TaskList { focused_border } else { border_color };
-        canvas.fill_rect(0.0, list_pane_y as f32, list_pane_w as f32, 1.0, list_border);
+        let list_border = if app.focus_area == FocusArea::TaskList {
+            focused_border
+        } else {
+            border_color
+        };
+        canvas.fill_rect(
+            0.0,
+            list_pane_y as f32,
+            list_pane_w as f32,
+            1.0,
+            list_border,
+        );
 
         // Background
-        canvas.fill_rect(0.0, (list_pane_y + 1) as f32, list_pane_w as f32, (list_pane_h - 1) as f32, bg_color);
+        canvas.fill_rect(
+            0.0,
+            (list_pane_y + 1) as f32,
+            list_pane_w as f32,
+            (list_pane_h - 1) as f32,
+            bg_color,
+        );
 
         // Header for list pane
         let list_header_text = if app.task_list.visible && app.error_list.visible {
@@ -1749,9 +1922,28 @@ fn render(
         } else {
             "Errors"
         };
-        let list_header_rect = Rect::new(padding, list_pane_y + 1, list_pane_w - padding as u32 * 2, 24);
-        canvas.fill_rect(0.0, (list_pane_y + 1) as f32, list_pane_w as f32, 24.0, header_bg);
-        text_renderer.draw_text_in_rect(canvas, list_header_text, list_header_rect, font_size, fg_color, HAlign::Left, VAlign::Center);
+        let list_header_rect = Rect::new(
+            padding,
+            list_pane_y + 1,
+            list_pane_w - padding as u32 * 2,
+            24,
+        );
+        canvas.fill_rect(
+            0.0,
+            (list_pane_y + 1) as f32,
+            list_pane_w as f32,
+            24.0,
+            header_bg,
+        );
+        text_renderer.draw_text_in_rect(
+            canvas,
+            list_header_text,
+            list_header_rect,
+            font_size,
+            fg_color,
+            HAlign::Left,
+            VAlign::Center,
+        );
 
         // List content area
         let list_content_y = list_pane_y + 25;
@@ -1765,7 +1957,9 @@ fn render(
             jobs.iter().filter(|j| j.is_failed()).collect()
         } else if app.task_list.visible && !app.error_list.visible {
             // Only active/pending tasks
-            jobs.iter().filter(|j| j.is_active() || j.is_complete()).collect()
+            jobs.iter()
+                .filter(|j| j.is_active() || j.is_complete())
+                .collect()
         } else {
             // Both
             jobs.iter().collect()
@@ -1784,24 +1978,43 @@ fn render(
 
             // Highlight cursor row
             if is_cursor {
-                canvas.fill_rect(0.0, y as f32, list_pane_w as f32, line_height as f32, cursor_bg);
+                canvas.fill_rect(
+                    0.0,
+                    y as f32,
+                    list_pane_w as f32,
+                    line_height as f32,
+                    cursor_bg,
+                );
             }
 
             // Job status icon
             let status_icon = match &job.status {
-                jobs::JobStatus::Pending => "\u{f017}",  // clock
-                jobs::JobStatus::Running => "\u{f110}",  // spinner
-                jobs::JobStatus::Complete => "\u{f00c}", // check
+                jobs::JobStatus::Pending => "\u{f017}",   // clock
+                jobs::JobStatus::Running => "\u{f110}",   // spinner
+                jobs::JobStatus::Complete => "\u{f00c}",  // check
                 jobs::JobStatus::Failed(_) => "\u{f00d}", // x
             };
 
             // Job description
             let job_text = format!("{} {}", status_icon, job.description);
-            let row_rect = Rect::new(padding, y, (list_pane_w as i32 - padding * 3 - 100) as u32, line_height as u32);
-            text_renderer.draw_text_in_rect(canvas, &job_text, row_rect, font_size, fg_color, HAlign::Left, VAlign::Center);
+            let row_rect = Rect::new(
+                padding,
+                y,
+                (list_pane_w as i32 - padding * 3 - 100) as u32,
+                line_height as u32,
+            );
+            text_renderer.draw_text_in_rect(
+                canvas,
+                &job_text,
+                row_rect,
+                font_size,
+                fg_color,
+                HAlign::Left,
+                VAlign::Center,
+            );
 
             // Progress bar or status on the right side
-            let progress_rect_x = (list_pane_w as i32 - padding - 100) as i32;
+            let progress_rect_x = list_pane_w as i32 - padding - 100;
             let progress_rect_w = 100u32;
             let progress_rect = Rect::new(progress_rect_x, y, progress_rect_w, line_height as u32);
 
@@ -1811,27 +2024,71 @@ fn render(
                         // Draw progress bar background
                         let bar_y = y + 8;
                         let bar_h = 8;
-                        canvas.fill_rect(progress_rect_x as f32, bar_y as f32, progress_rect_w as f32, bar_h as f32, border_color);
+                        canvas.fill_rect(
+                            progress_rect_x as f32,
+                            bar_y as f32,
+                            progress_rect_w as f32,
+                            bar_h as f32,
+                            border_color,
+                        );
                         // Draw progress fill
                         let fill_w = (progress_rect_w as f32 * progress) as u32;
                         let progress_color = Color::from_rgba8(100, 200, 100, 255);
-                        canvas.fill_rect(progress_rect_x as f32, bar_y as f32, fill_w as f32, bar_h as f32, progress_color);
+                        canvas.fill_rect(
+                            progress_rect_x as f32,
+                            bar_y as f32,
+                            fill_w as f32,
+                            bar_h as f32,
+                            progress_color,
+                        );
                     } else {
                         // Show "Running..." text for indeterminate
-                        text_renderer.draw_text_in_rect(canvas, "Running...", progress_rect, font_size - 2.0, fg_color, HAlign::Right, VAlign::Center);
+                        text_renderer.draw_text_in_rect(
+                            canvas,
+                            "Running...",
+                            progress_rect,
+                            font_size - 2.0,
+                            fg_color,
+                            HAlign::Right,
+                            VAlign::Center,
+                        );
                     }
                 }
                 jobs::JobStatus::Complete => {
                     let done_color = TextColor::rgb(100, 200, 100);
-                    text_renderer.draw_text_in_rect(canvas, "Done", progress_rect, font_size - 2.0, done_color, HAlign::Right, VAlign::Center);
+                    text_renderer.draw_text_in_rect(
+                        canvas,
+                        "Done",
+                        progress_rect,
+                        font_size - 2.0,
+                        done_color,
+                        HAlign::Right,
+                        VAlign::Center,
+                    );
                 }
                 jobs::JobStatus::Failed(msg) => {
                     let err_color = TextColor::rgb(200, 100, 100);
                     let short_msg = if msg.len() > 15 { &msg[..15] } else { msg };
-                    text_renderer.draw_text_in_rect(canvas, short_msg, progress_rect, font_size - 2.0, err_color, HAlign::Right, VAlign::Center);
+                    text_renderer.draw_text_in_rect(
+                        canvas,
+                        short_msg,
+                        progress_rect,
+                        font_size - 2.0,
+                        err_color,
+                        HAlign::Right,
+                        VAlign::Center,
+                    );
                 }
                 jobs::JobStatus::Pending => {
-                    text_renderer.draw_text_in_rect(canvas, "Pending", progress_rect, font_size - 2.0, fg_color, HAlign::Right, VAlign::Center);
+                    text_renderer.draw_text_in_rect(
+                        canvas,
+                        "Pending",
+                        progress_rect,
+                        font_size - 2.0,
+                        fg_color,
+                        HAlign::Right,
+                        VAlign::Center,
+                    );
                 }
             }
         }
@@ -1845,9 +2102,22 @@ fn render(
             } else {
                 "No tasks"
             };
-            let empty_rect = Rect::new(padding, list_content_y, list_pane_w - padding as u32 * 2, line_height as u32);
+            let empty_rect = Rect::new(
+                padding,
+                list_content_y,
+                list_pane_w - padding as u32 * 2,
+                line_height as u32,
+            );
             let dim_color = TextColor::rgb(128, 128, 128);
-            text_renderer.draw_text_in_rect(canvas, empty_text, empty_rect, font_size, dim_color, HAlign::Center, VAlign::Center);
+            text_renderer.draw_text_in_rect(
+                canvas,
+                empty_text,
+                empty_rect,
+                font_size,
+                dim_color,
+                HAlign::Center,
+                VAlign::Center,
+            );
         }
     }
 
@@ -1869,58 +2139,152 @@ fn render(
         canvas.fill_rect(0.0, 0.0, width as f32, height as f32, overlay_bg);
 
         // Panel background
-        let panel_bg = Color::from_rgba8(theme.background.r, theme.background.g, theme.background.b, 250);
-        canvas.fill_rect(panel_x as f32, panel_y as f32, panel_width as f32, panel_height as f32, panel_bg);
+        let panel_bg = Color::from_rgba8(
+            theme.background.r,
+            theme.background.g,
+            theme.background.b,
+            250,
+        );
+        canvas.fill_rect(
+            panel_x as f32,
+            panel_y as f32,
+            panel_width as f32,
+            panel_height as f32,
+            panel_bg,
+        );
 
         // Panel border
-        let panel_border = if app.focus_area == FocusArea::FeatureList { focused_border } else { border_color };
-        canvas.fill_rect(panel_x as f32, panel_y as f32, panel_width as f32, 1.0, panel_border);
-        canvas.fill_rect(panel_x as f32, (panel_y + panel_height as i32 - 1) as f32, panel_width as f32, 1.0, panel_border);
-        canvas.fill_rect(panel_x as f32, panel_y as f32, 1.0, panel_height as f32, panel_border);
-        canvas.fill_rect((panel_x + panel_width as i32 - 1) as f32, panel_y as f32, 1.0, panel_height as f32, panel_border);
+        let panel_border = if app.focus_area == FocusArea::FeatureList {
+            focused_border
+        } else {
+            border_color
+        };
+        canvas.fill_rect(
+            panel_x as f32,
+            panel_y as f32,
+            panel_width as f32,
+            1.0,
+            panel_border,
+        );
+        canvas.fill_rect(
+            panel_x as f32,
+            (panel_y + panel_height as i32 - 1) as f32,
+            panel_width as f32,
+            1.0,
+            panel_border,
+        );
+        canvas.fill_rect(
+            panel_x as f32,
+            panel_y as f32,
+            1.0,
+            panel_height as f32,
+            panel_border,
+        );
+        canvas.fill_rect(
+            (panel_x + panel_width as i32 - 1) as f32,
+            panel_y as f32,
+            1.0,
+            panel_height as f32,
+            panel_border,
+        );
 
         // Panel header
         let header_y = panel_y + 1;
-        canvas.fill_rect((panel_x + 1) as f32, header_y as f32, (panel_width - 2) as f32, header_height as f32, header_bg);
+        canvas.fill_rect(
+            (panel_x + 1) as f32,
+            header_y as f32,
+            (panel_width - 2) as f32,
+            header_height as f32,
+            header_bg,
+        );
         let available = app.feature_list.available_count();
         let unavailable = app.feature_list.unavailable_count();
-        let header_text = format!("Features ({} available, {} unavailable) - F12 to close", available, unavailable);
-        let header_rect = Rect::new(panel_x + padding, header_y, panel_width - padding as u32 * 2, header_height as u32);
-        text_renderer.draw_text_in_rect(canvas, &header_text, header_rect, font_size, fg_color, HAlign::Left, VAlign::Center);
+        let header_text = format!(
+            "Features ({} available, {} unavailable) - F12 to close",
+            available, unavailable
+        );
+        let header_rect = Rect::new(
+            panel_x + padding,
+            header_y,
+            panel_width - padding as u32 * 2,
+            header_height as u32,
+        );
+        text_renderer.draw_text_in_rect(
+            canvas,
+            &header_text,
+            header_rect,
+            font_size,
+            fg_color,
+            HAlign::Left,
+            VAlign::Center,
+        );
 
         // Feature list content
         let content_y = header_y + header_height;
         let content_height = panel_height as i32 - header_height - 2;
         let visible_features = (content_height / line_height).max(0) as usize;
 
-        for (i, feature) in app.feature_list.features.iter().enumerate().take(visible_features) {
+        for (i, feature) in app
+            .feature_list
+            .features
+            .iter()
+            .enumerate()
+            .take(visible_features)
+        {
             let y = content_y + (i as i32 * line_height);
             let is_cursor = i == app.feature_pane.cursor;
 
             // Highlight cursor row
             if is_cursor {
-                canvas.fill_rect((panel_x + 1) as f32, y as f32, (panel_width - 2) as f32, line_height as f32, cursor_bg);
+                canvas.fill_rect(
+                    (panel_x + 1) as f32,
+                    y as f32,
+                    (panel_width - 2) as f32,
+                    line_height as f32,
+                    cursor_bg,
+                );
             }
 
             // Status icon
             let status_icon = if feature.available {
-                "\u{f00c}"  // check mark
+                "\u{f00c}" // check mark
             } else {
-                "\u{f00d}"  // x mark
+                "\u{f00d}" // x mark
             };
             let status_color = if feature.available {
-                TextColor::rgb(100, 200, 100)  // green
+                TextColor::rgb(100, 200, 100) // green
             } else {
-                TextColor::rgb(200, 100, 100)  // red
+                TextColor::rgb(200, 100, 100) // red
             };
 
             // Draw status icon
             let icon_rect = Rect::new(panel_x + padding, y, 20, line_height as u32);
-            text_renderer.draw_text_in_rect(canvas, status_icon, icon_rect, font_size, status_color, HAlign::Left, VAlign::Center);
+            text_renderer.draw_text_in_rect(
+                canvas,
+                status_icon,
+                icon_rect,
+                font_size,
+                status_color,
+                HAlign::Left,
+                VAlign::Center,
+            );
 
             // Draw feature name
-            let name_rect = Rect::new(panel_x + padding + 24, y, panel_width - padding as u32 * 2 - 24, line_height as u32);
-            text_renderer.draw_text_in_rect(canvas, feature.name, name_rect, font_size, fg_color, HAlign::Left, VAlign::Center);
+            let name_rect = Rect::new(
+                panel_x + padding + 24,
+                y,
+                panel_width - padding as u32 * 2 - 24,
+                line_height as u32,
+            );
+            text_renderer.draw_text_in_rect(
+                canvas,
+                feature.name,
+                name_rect,
+                font_size,
+                fg_color,
+                HAlign::Left,
+                VAlign::Center,
+            );
         }
 
         // Show detail if requested
@@ -1931,60 +2295,148 @@ fn render(
 
                 if detail_h > 0 {
                     // Separator line
-                    canvas.fill_rect((panel_x + padding) as f32, (detail_y - 4) as f32, (panel_width as i32 - padding * 2) as f32, 1.0, border_color);
+                    canvas.fill_rect(
+                        (panel_x + padding) as f32,
+                        (detail_y - 4) as f32,
+                        (panel_width as i32 - padding * 2) as f32,
+                        1.0,
+                        border_color,
+                    );
 
                     // Description
-                    let desc_rect = Rect::new(panel_x + padding, detail_y, panel_width - padding as u32 * 2, line_height as u32);
-                    text_renderer.draw_text_in_rect(canvas, feature.description, desc_rect, font_size - 1.0, fg_color, HAlign::Left, VAlign::Center);
+                    let desc_rect = Rect::new(
+                        panel_x + padding,
+                        detail_y,
+                        panel_width - padding as u32 * 2,
+                        line_height as u32,
+                    );
+                    text_renderer.draw_text_in_rect(
+                        canvas,
+                        feature.description,
+                        desc_rect,
+                        font_size - 1.0,
+                        fg_color,
+                        HAlign::Left,
+                        VAlign::Center,
+                    );
 
                     // Reason if unavailable
                     if let Some(ref reason) = feature.reason {
                         let reason_y = detail_y + line_height;
-                        let reason_rect = Rect::new(panel_x + padding, reason_y, panel_width - padding as u32 * 2, (detail_h - line_height).max(line_height) as u32);
-                        let reason_color = TextColor::rgb(200, 150, 100);  // orange/warning color
-                        text_renderer.draw_text_in_rect(canvas, reason, reason_rect, font_size - 2.0, reason_color, HAlign::Left, VAlign::Top);
+                        let reason_rect = Rect::new(
+                            panel_x + padding,
+                            reason_y,
+                            panel_width - padding as u32 * 2,
+                            (detail_h - line_height).max(line_height) as u32,
+                        );
+                        let reason_color = TextColor::rgb(200, 150, 100); // orange/warning color
+                        text_renderer.draw_text_in_rect(
+                            canvas,
+                            reason,
+                            reason_rect,
+                            font_size - 2.0,
+                            reason_color,
+                            HAlign::Left,
+                            VAlign::Top,
+                        );
                     }
                 }
             }
         } else {
             // Hint at bottom
             let hint_y = panel_y + panel_height as i32 - line_height - 4;
-            let hint_rect = Rect::new(panel_x + padding, hint_y, panel_width - padding as u32 * 2, line_height as u32);
+            let hint_rect = Rect::new(
+                panel_x + padding,
+                hint_y,
+                panel_width - padding as u32 * 2,
+                line_height as u32,
+            );
             let dim_color = TextColor::rgb(128, 128, 128);
-            text_renderer.draw_text_in_rect(canvas, "Press Enter for details, Escape to close", hint_rect, font_size - 2.0, dim_color, HAlign::Center, VAlign::Center);
+            text_renderer.draw_text_in_rect(
+                canvas,
+                "Press Enter for details, Escape to close",
+                hint_rect,
+                font_size - 2.0,
+                dim_color,
+                HAlign::Center,
+                VAlign::Center,
+            );
         }
     }
 
     // Status bar (global, below all splits)
     let status_y = height as i32 - status_height;
-    canvas.fill_rect(0.0, status_y as f32, width as f32, status_height as f32, status_bg);
+    canvas.fill_rect(
+        0.0,
+        status_y as f32,
+        width as f32,
+        status_height as f32,
+        status_bg,
+    );
 
-    let status_rect = Rect::new(padding, status_y, width - padding as u32 * 2, status_height as u32);
+    let status_rect = Rect::new(
+        padding,
+        status_y,
+        width - padding as u32 * 2,
+        status_height as u32,
+    );
 
     if app.mode == Mode::Command {
         // Command mode: show only the command line
         let cmd_display = format!(":{}", app.command_buffer);
-        text_renderer.draw_text_in_rect(canvas, &cmd_display, status_rect, font_size, fg_color, HAlign::Left, VAlign::Center);
+        text_renderer.draw_text_in_rect(
+            canvas,
+            &cmd_display,
+            status_rect,
+            font_size,
+            fg_color,
+            HAlign::Left,
+            VAlign::Center,
+        );
     } else if app.mode == Mode::Search {
         // Search mode: show search buffer
         let search_display = format!("/{}", app.search_buffer);
-        text_renderer.draw_text_in_rect(canvas, &search_display, status_rect, font_size, fg_color, HAlign::Left, VAlign::Center);
+        text_renderer.draw_text_in_rect(
+            canvas,
+            &search_display,
+            status_rect,
+            font_size,
+            fg_color,
+            HAlign::Left,
+            VAlign::Center,
+        );
     } else {
         // Normal/Visual mode: show mode indicator and entry count
         let mode_str = app.mode.display();
-        text_renderer.draw_text_in_rect(canvas, mode_str, status_rect, font_size, fg_color, HAlign::Left, VAlign::Center);
+        text_renderer.draw_text_in_rect(
+            canvas,
+            mode_str,
+            status_rect,
+            font_size,
+            fg_color,
+            HAlign::Left,
+            VAlign::Center,
+        );
 
         // Show search info in center if highlighting is active
-        if app.search_highlight {
-            if let Some(ref pattern) = app.last_search {
-                let match_info = if app.search_matches.is_empty() {
-                    format!("?{} [0/0]", pattern)
-                } else {
-                    let current = app.current_match.map(|i| i + 1).unwrap_or(0);
-                    format!("?{} [{}/{}]", pattern, current, app.search_matches.len())
-                };
-                text_renderer.draw_text_in_rect(canvas, &match_info, status_rect, font_size, fg_color, HAlign::Center, VAlign::Center);
-            }
+        if app.search_highlight
+            && let Some(ref pattern) = app.last_search
+        {
+            let match_info = if app.search_matches.is_empty() {
+                format!("?{} [0/0]", pattern)
+            } else {
+                let current = app.current_match.map(|i| i + 1).unwrap_or(0);
+                format!("?{} [{}/{}]", pattern, current, app.search_matches.len())
+            };
+            text_renderer.draw_text_in_rect(
+                canvas,
+                &match_info,
+                status_rect,
+                font_size,
+                fg_color,
+                HAlign::Center,
+                VAlign::Center,
+            );
         }
 
         // Build right-side status info
@@ -2006,35 +2458,65 @@ fn render(
         }
 
         if !right_info.is_empty() {
-            text_renderer.draw_text_in_rect(canvas, &right_info, status_rect, font_size, fg_color, HAlign::Right, VAlign::Center);
+            text_renderer.draw_text_in_rect(
+                canvas,
+                &right_info,
+                status_rect,
+                font_size,
+                fg_color,
+                HAlign::Right,
+                VAlign::Center,
+            );
         }
     }
 }
 
 fn is_image_file(path: &std::path::Path) -> bool {
     matches!(
-        path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref(),
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .as_deref(),
         Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp")
     )
 }
 
 fn is_text_file(path: &std::path::Path) -> bool {
     matches!(
-        path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref(),
-        Some("txt" | "md" | "rs" | "toml" | "json" | "yaml" | "yml" | "sh" | "py" | "js" | "ts" | "c" | "h" | "cpp" | "hpp")
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .as_deref(),
+        Some(
+            "txt"
+                | "md"
+                | "rs"
+                | "toml"
+                | "json"
+                | "yaml"
+                | "yml"
+                | "sh"
+                | "py"
+                | "js"
+                | "ts"
+                | "c"
+                | "h"
+                | "cpp"
+                | "hpp"
+        )
     )
 }
 
-fn render_preview(
-    canvas: &mut Canvas,
-    text_renderer: &mut TextRenderer,
-    content: &PreviewContent,
-) {
+fn render_preview(canvas: &mut Canvas, text_renderer: &mut TextRenderer, content: &PreviewContent) {
     // Transparent background
     canvas.clear(Color::from_rgba8(0, 0, 0, 0));
 
     match content {
-        PreviewContent::Image { data, width: img_w, height: img_h } => {
+        PreviewContent::Image {
+            data,
+            width: img_w,
+            height: img_h,
+        } => {
             // Draw image at origin (surface is sized to fit)
             canvas.draw_rgba(0, 0, *img_w, *img_h, data);
         }
@@ -2050,7 +2532,11 @@ fn render_preview(
                     break;
                 }
                 let line_rect = Rect::new(0, y, width, line_height as u32);
-                let display_line = if line.len() > 80 { &line[..80] } else { line.as_str() };
+                let display_line = if line.len() > 80 {
+                    &line[..80]
+                } else {
+                    line.as_str()
+                };
                 text_renderer.draw_text_in_rect(
                     canvas,
                     display_line,
@@ -2187,8 +2673,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Poll with timeout based on key repeat state
         let timeout_ms = mkapp.key_repeat_timeout().map(|t| t as i32).unwrap_or(-1);
         let fd = mkapp.connection_fd();
-        let mut pfd = libc::pollfd { fd, events: libc::POLLIN, revents: 0 };
-        unsafe { libc::poll(&mut pfd, 1, timeout_ms); }
+        let mut pfd = libc::pollfd {
+            fd,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        unsafe {
+            libc::poll(&mut pfd, 1, timeout_ms);
+        }
 
         // Read any incoming events and dispatch
         if let Some(guard) = event_queue.prepare_read() {
@@ -2202,10 +2694,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
 
-            if let Some(key_str) = event.to_key_string() {
-                if app.process_key(&key_str) {
-                    needs_redraw = true;
-                }
+            if let Some(key_str) = event.to_key_string()
+                && app.process_key(&key_str)
+            {
+                needs_redraw = true;
             }
         }
 
@@ -2221,9 +2713,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Check if we should start a drag operation
         if let Some(files) = app.take_drag_files() {
-            if mkapp.start_drag(&qh, window_id, &files) {
-                // Drag started successfully
-            }
+            let _ = mkapp.start_drag(&qh, window_id, &files);
         }
 
         // Handle drop events (files dropped from other applications)
@@ -2237,7 +2727,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let dest = dest_dir.join(file_name);
                             let kind = jobs::JobKind::Copy { src: file, dest };
                             let job_id = app.job_queue.submit(kind.clone());
-                            app.runtime.spawn(jobs::execute_job(job_id, kind, app.job_queue.sender()));
+                            app.runtime.spawn(jobs::execute_job(
+                                job_id,
+                                kind,
+                                app.job_queue.sender(),
+                            ));
                         }
                     }
                 }
@@ -2300,7 +2794,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             OverlayPosition::Bottom => AttachedAnchor::Bottom,
         };
         let margin = overlay_config.margin.resolve(win_w.min(win_h));
-        let offset = overlay_config.offset.resolve(if matches!(overlay_config.position, OverlayPosition::Left | OverlayPosition::Right) { win_h } else { win_w });
+        let offset = overlay_config.offset.resolve(
+            if matches!(
+                overlay_config.position,
+                OverlayPosition::Left | OverlayPosition::Right
+            ) {
+                win_h
+            } else {
+                win_w
+            },
+        );
 
         // Update preview surface state (attached surface preferred, subsurface fallback)
         if should_show_preview {
@@ -2328,16 +2831,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if preview_attached.is_none() && preview_subsurface.is_none() {
                         if use_attached_surface {
                             preview_attached = mkapp.create_attached_surface(
-                                &qh,
-                                window_id,
-                                0, // Position handled by anchor
-                                0,
-                                actual_w,
-                                actual_h,
+                                &qh, window_id, 0, // Position handled by anchor
+                                0, actual_w, actual_h,
                             );
                             // Set anchor for automatic positioning
                             if let Some(attached_id) = preview_attached {
-                                mkapp.set_attached_surface_anchor(attached_id, anchor, margin, offset);
+                                mkapp.set_attached_surface_anchor(
+                                    attached_id,
+                                    anchor,
+                                    margin,
+                                    offset,
+                                );
                             }
                         } else {
                             // Fallback: calculate position manually for subsurface
@@ -2348,12 +2852,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 OverlayPosition::Bottom => (offset, win_h as i32 + margin),
                             };
                             preview_subsurface = mkapp.create_subsurface(
-                                &qh,
-                                window_id,
-                                preview_x,
-                                preview_y,
-                                actual_w,
-                                actual_h,
+                                &qh, window_id, preview_x, preview_y, actual_w, actual_h,
                             );
                         }
                     }
@@ -2389,22 +2888,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(path) = &preview_path {
             if let Some(attached_id) = preview_attached {
                 if mkapp.is_attached_surface_dirty(attached_id) || preview_needs_render {
-                    let content = preview_cache.get_or_load(path, preview_width - 20, preview_height - 20);
+                    let content =
+                        preview_cache.get_or_load(path, preview_width - 20, preview_height - 20);
                     mkapp.render_attached_surface(attached_id, |canvas| {
                         render_preview(canvas, &mut text_renderer, content);
                     });
                     mkapp.flush();
                     preview_needs_render = false;
                 }
-            } else if let Some(subsurface_id) = preview_subsurface {
-                if mkapp.is_subsurface_dirty(subsurface_id) || preview_needs_render {
-                    let content = preview_cache.get_or_load(path, preview_width - 20, preview_height - 20);
-                    mkapp.render_subsurface(subsurface_id, |canvas| {
-                        render_preview(canvas, &mut text_renderer, content);
-                    });
-                    mkapp.flush();
-                    preview_needs_render = false;
-                }
+            } else if let Some(subsurface_id) = preview_subsurface
+                && (mkapp.is_subsurface_dirty(subsurface_id) || preview_needs_render)
+            {
+                let content =
+                    preview_cache.get_or_load(path, preview_width - 20, preview_height - 20);
+                mkapp.render_subsurface(subsurface_id, |canvas| {
+                    render_preview(canvas, &mut text_renderer, content);
+                });
+                mkapp.flush();
+                preview_needs_render = false;
             }
         }
 

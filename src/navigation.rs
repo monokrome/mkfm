@@ -1,12 +1,12 @@
-use std::collections::HashSet;
-use std::path::PathBuf;
-use crate::filesystem::{self, Entry, ArchiveEntry};
+use crate::filesystem::{self, ArchiveEntry, Entry};
 use crate::input::SortMode;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 pub struct Browser {
     pub path: PathBuf,
     pub entries: Vec<Entry>,
-    all_entries: Vec<Entry>,  // Unfiltered entries for search
+    all_entries: Vec<Entry>, // Unfiltered entries for search
     pub cursor: usize,
     pub show_hidden: bool,
     pub show_parent_entry: bool,
@@ -14,11 +14,11 @@ pub struct Browser {
     sort_reverse: bool,
     filter: Option<String>,
     // Archive browsing state
-    archive_path: Option<PathBuf>,  // The archive file being browsed
-    archive_prefix: String,         // Current path within the archive
+    archive_path: Option<PathBuf>, // The archive file being browsed
+    archive_prefix: String,        // Current path within the archive
     archive_entries: Vec<ArchiveEntry>, // All entries in the archive
     // Inline expansion (fold) state
-    expanded_dirs: HashSet<PathBuf>,  // Directories that are expanded inline
+    expanded_dirs: HashSet<PathBuf>, // Directories that are expanded inline
 }
 
 impl Browser {
@@ -70,7 +70,8 @@ impl Browser {
 
         // Apply hidden filter
         if !self.show_hidden {
-            self.all_entries.retain(|e| !e.name.starts_with('.') || (self.show_parent_entry && e.name == ".."));
+            self.all_entries
+                .retain(|e| !e.name.starts_with('.') || (self.show_parent_entry && e.name == ".."));
         }
 
         // Apply sorting
@@ -112,7 +113,8 @@ impl Browser {
             let relative = if prefix.is_empty() {
                 entry_path.as_str()
             } else {
-                entry_path.strip_prefix(prefix)
+                entry_path
+                    .strip_prefix(prefix)
                     .and_then(|s| s.strip_prefix('/'))
                     .unwrap_or("")
             };
@@ -174,7 +176,7 @@ impl Browser {
         self.cursor = self.cursor.min(self.entries.len().saturating_sub(1));
     }
 
-    fn sort_entries_impl(entries: &mut Vec<Entry>, sort_mode: SortMode, sort_reverse: bool) {
+    fn sort_entries_impl(entries: &mut [Entry], sort_mode: SortMode, sort_reverse: bool) {
         // Keep ".." at top
         let has_parent = entries.first().map(|e| e.name == "..").unwrap_or(false);
         let start = if has_parent { 1 } else { 0 };
@@ -189,29 +191,23 @@ impl Browser {
                     _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
                 }
             }),
-            SortMode::Size => slice.sort_by(|a, b| {
-                match (a.is_dir, b.is_dir) {
-                    (true, false) => std::cmp::Ordering::Less,
-                    (false, true) => std::cmp::Ordering::Greater,
-                    _ => a.size.cmp(&b.size),
-                }
+            SortMode::Size => slice.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.size.cmp(&b.size),
             }),
-            SortMode::Date => slice.sort_by(|a, b| {
-                match (a.is_dir, b.is_dir) {
-                    (true, false) => std::cmp::Ordering::Less,
-                    (false, true) => std::cmp::Ordering::Greater,
-                    _ => a.modified.cmp(&b.modified),
-                }
+            SortMode::Date => slice.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.modified.cmp(&b.modified),
             }),
-            SortMode::Type => slice.sort_by(|a, b| {
-                match (a.is_dir, b.is_dir) {
-                    (true, false) => std::cmp::Ordering::Less,
-                    (false, true) => std::cmp::Ordering::Greater,
-                    _ => {
-                        let ext_a = a.path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                        let ext_b = b.path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                        ext_a.to_lowercase().cmp(&ext_b.to_lowercase())
-                    }
+            SortMode::Type => slice.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => {
+                    let ext_a = a.path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    let ext_b = b.path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    ext_a.to_lowercase().cmp(&ext_b.to_lowercase())
                 }
             }),
         }
@@ -224,7 +220,8 @@ impl Browser {
     fn apply_filter(&mut self) {
         if let Some(ref pattern) = self.filter {
             let pattern_lower = pattern.to_lowercase();
-            self.entries = self.all_entries
+            self.entries = self
+                .all_entries
                 .iter()
                 .filter(|e| e.name.to_lowercase().contains(&pattern_lower))
                 .cloned()
@@ -253,7 +250,9 @@ impl Browser {
     }
 
     pub fn enter_directory(&mut self) -> bool {
-        let Some(entry) = self.current_entry().cloned() else { return false };
+        let Some(entry) = self.current_entry().cloned() else {
+            return false;
+        };
 
         // In archive mode
         if self.archive_path.is_some() {
@@ -288,7 +287,9 @@ impl Browser {
             return true;
         }
 
-        if !entry.is_dir { return false; }
+        if !entry.is_dir {
+            return false;
+        }
 
         self.path = entry.path.clone();
         self.refresh();
@@ -297,9 +298,9 @@ impl Browser {
     }
 
     /// Enter archive browsing mode
-    fn enter_archive(&mut self, archive_path: &PathBuf) {
+    fn enter_archive(&mut self, archive_path: &Path) {
         self.archive_entries = filesystem::list_archive(archive_path);
-        self.archive_path = Some(archive_path.clone());
+        self.archive_path = Some(archive_path.to_path_buf());
         self.archive_prefix.clear();
         self.refresh();
         self.cursor = 0;
@@ -319,8 +320,8 @@ impl Browser {
     }
 
     /// Get the archive path if browsing an archive
-    pub fn get_archive_path(&self) -> Option<&PathBuf> {
-        self.archive_path.as_ref()
+    pub fn get_archive_path(&self) -> Option<&Path> {
+        self.archive_path.as_deref()
     }
 
     /// Get current path within archive
@@ -346,7 +347,9 @@ impl Browser {
             return true;
         }
 
-        let Some(parent) = self.path.parent() else { return false };
+        let Some(parent) = self.path.parent() else {
+            return false;
+        };
 
         self.path = parent.to_path_buf();
         self.refresh();
@@ -381,9 +384,9 @@ impl Browser {
     }
 
     /// Navigate to a specific path
-    pub fn navigate_to(&mut self, path: &PathBuf) {
+    pub fn navigate_to(&mut self, path: &Path) {
         if path.is_dir() {
-            self.path = path.clone();
+            self.path = path.to_path_buf();
             self.refresh();
             self.cursor = 0;
         }
@@ -460,15 +463,21 @@ impl Browser {
     // ==================== Fold (inline expansion) methods ====================
 
     /// Check if a directory is expanded
-    pub fn is_expanded(&self, path: &PathBuf) -> bool {
+    pub fn is_expanded(&self, path: &Path) -> bool {
         self.expanded_dirs.contains(path)
     }
 
     /// Expand a directory inline at the given index
     pub fn expand_directory(&mut self, index: usize, recursive: bool) {
-        let Some(entry) = self.entries.get(index).cloned() else { return };
-        if !entry.is_dir || entry.name == ".." { return; }
-        if self.expanded_dirs.contains(&entry.path) { return; }
+        let Some(entry) = self.entries.get(index).cloned() else {
+            return;
+        };
+        if !entry.is_dir || entry.name == ".." {
+            return;
+        }
+        if self.expanded_dirs.contains(&entry.path) {
+            return;
+        }
 
         self.expanded_dirs.insert(entry.path.clone());
 
@@ -493,9 +502,15 @@ impl Browser {
 
     /// Collapse a directory at the given index
     pub fn collapse_directory(&mut self, index: usize, recursive: bool) {
-        let Some(entry) = self.entries.get(index).cloned() else { return };
-        if !entry.is_dir || entry.name == ".." { return; }
-        if !self.expanded_dirs.contains(&entry.path) { return; }
+        let Some(entry) = self.entries.get(index).cloned() else {
+            return;
+        };
+        if !entry.is_dir || entry.name == ".." {
+            return;
+        }
+        if !self.expanded_dirs.contains(&entry.path) {
+            return;
+        }
 
         // Find range of children to remove
         let range = self.find_children_range(index);
@@ -503,10 +518,10 @@ impl Browser {
         if recursive {
             // Also remove from expanded_dirs any nested directories
             for i in range.clone() {
-                if let Some(child) = self.entries.get(i) {
-                    if child.is_dir {
-                        self.expanded_dirs.remove(&child.path);
-                    }
+                if let Some(child) = self.entries.get(i)
+                    && child.is_dir
+                {
+                    self.expanded_dirs.remove(&child.path);
                 }
             }
         }
@@ -524,8 +539,12 @@ impl Browser {
 
     /// Toggle expansion state of directory at index
     pub fn toggle_expansion(&mut self, index: usize, recursive: bool) {
-        let Some(entry) = self.entries.get(index) else { return };
-        if !entry.is_dir || entry.name == ".." { return; }
+        let Some(entry) = self.entries.get(index) else {
+            return;
+        };
+        if !entry.is_dir || entry.name == ".." {
+            return;
+        }
 
         if self.expanded_dirs.contains(&entry.path) {
             self.collapse_directory(index, recursive);
@@ -549,7 +568,7 @@ impl Browser {
     }
 
     /// Load children of a directory with specified depth
-    fn load_children(&self, dir_path: &PathBuf, depth: u8) -> Vec<Entry> {
+    fn load_children(&self, dir_path: &Path, depth: u8) -> Vec<Entry> {
         let mut children = filesystem::list_directory(dir_path);
 
         // Remove ".." entry and set depth
@@ -576,7 +595,8 @@ impl Browser {
 
         // Apply hidden filter
         if !self.show_hidden {
-            new_entries.retain(|e| !e.name.starts_with('.') || (self.show_parent_entry && e.name == ".."));
+            new_entries
+                .retain(|e| !e.name.starts_with('.') || (self.show_parent_entry && e.name == ".."));
         }
 
         // Apply sorting
@@ -607,7 +627,7 @@ pub struct Clipboard {
     pub is_cut: bool,
     // Archive source for copying files from archives
     archive_source: Option<PathBuf>,
-    archive_files: Vec<String>,  // Paths within the archive
+    archive_files: Vec<String>, // Paths within the archive
 }
 
 impl Clipboard {
@@ -647,7 +667,7 @@ impl Clipboard {
         self.archive_source.is_some()
     }
 
-    pub fn paste_to(&mut self, dest_dir: &PathBuf) -> std::io::Result<()> {
+    pub fn paste_to(&mut self, dest_dir: &Path) -> std::io::Result<()> {
         // Handle archive extraction
         if let Some(ref archive_path) = self.archive_source {
             filesystem::extract_files_from_archive(archive_path, &self.archive_files, dest_dir)?;
@@ -657,7 +677,9 @@ impl Clipboard {
 
         // Normal file copy/move
         for src in &self.paths {
-            let Some(name) = src.file_name() else { continue };
+            let Some(name) = src.file_name() else {
+                continue;
+            };
             let dest = dest_dir.join(name);
 
             if self.is_cut {
@@ -682,7 +704,9 @@ pub struct Selection {
 
 impl Selection {
     pub fn new() -> Self {
-        Self { indices: Vec::new() }
+        Self {
+            indices: Vec::new(),
+        }
     }
 
     pub fn clear(&mut self) {

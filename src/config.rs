@@ -33,8 +33,9 @@ impl SavedSettings {
 
     /// Save settings to config file, merging with existing config
     pub fn save(&self) -> std::io::Result<()> {
-        let path = Self::config_path()
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "config dir not found"))?;
+        let path = Self::config_path().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "config dir not found")
+        })?;
 
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
@@ -52,7 +53,8 @@ impl SavedSettings {
         }
         if let Some(v) = self.overlay_enabled {
             // Handle nested overlay.enabled
-            let overlay = table.entry("overlay".to_string())
+            let overlay = table
+                .entry("overlay".to_string())
                 .or_insert_with(|| toml::Value::Table(Map::new()));
             if let toml::Value::Table(t) = overlay {
                 t.insert("enabled".to_string(), toml::Value::Boolean(v));
@@ -134,15 +136,15 @@ impl Default for Theme {
             foreground: Rgb::new(220, 220, 220),
             cursor_bg: Rgba::new(60, 60, 80, 255),
             selection_bg: Rgba::new(80, 60, 60, 255),
-            search_highlight_bg: Rgba::new(180, 180, 0, 100),  // Yellow highlight
-            directory: Rgb::new(138, 79, 255),  // Royal purple
+            search_highlight_bg: Rgba::new(180, 180, 0, 100), // Yellow highlight
+            directory: Rgb::new(138, 79, 255),                // Royal purple
             header_bg: Rgba::new(40, 40, 50, 255),
             status_bg: Rgba::new(50, 50, 60, 255),
             border: Rgba::new(80, 80, 100, 255),
             border_focused: Rgba::new(100, 150, 255, 255),
-            icon_folder: "\u{f07b}".to_string(),  //
-            icon_folder_open: "\u{f07c}".to_string(),  //
-            icon_file: "\u{f15b}".to_string(),    //
+            icon_folder: "\u{f07b}".to_string(),      //
+            icon_folder_open: "\u{f07c}".to_string(), //
+            icon_file: "\u{f15b}".to_string(),        //
         }
     }
 }
@@ -221,59 +223,63 @@ impl Theme {
         let mut theme = Self::default();
 
         async fn get_str(config: &PreferConfig, key: &str) -> Option<String> {
-            config.get(key).await.ok().and_then(|v: prefer::ConfigValue| v.as_str().map(|s| s.to_string()))
+            config
+                .get(key)
+                .await
+                .ok()
+                .and_then(|v: prefer::ConfigValue| v.as_str().map(|s| s.to_string()))
         }
 
         // Load colors
-        if let Some(s) = get_str(&config, "background").await {
-            if let Some((r, g, b, a)) = parse_rgba(&s) {
-                theme.background = Rgba::new(r, g, b, a);
-            }
+        if let Some(s) = get_str(&config, "background").await
+            && let Some((r, g, b, a)) = parse_rgba(&s)
+        {
+            theme.background = Rgba::new(r, g, b, a);
         }
-        if let Some(s) = get_str(&config, "foreground").await {
-            if let Some((r, g, b)) = parse_rgb(&s) {
-                theme.foreground = Rgb::new(r, g, b);
-            }
+        if let Some(s) = get_str(&config, "foreground").await
+            && let Some((r, g, b)) = parse_rgb(&s)
+        {
+            theme.foreground = Rgb::new(r, g, b);
         }
-        if let Some(s) = get_str(&config, "cursor_bg").await {
-            if let Some((r, g, b, a)) = parse_rgba(&s) {
-                theme.cursor_bg = Rgba::new(r, g, b, a);
-            }
+        if let Some(s) = get_str(&config, "cursor_bg").await
+            && let Some((r, g, b, a)) = parse_rgba(&s)
+        {
+            theme.cursor_bg = Rgba::new(r, g, b, a);
         }
-        if let Some(s) = get_str(&config, "selection_bg").await {
-            if let Some((r, g, b, a)) = parse_rgba(&s) {
-                theme.selection_bg = Rgba::new(r, g, b, a);
-            }
+        if let Some(s) = get_str(&config, "selection_bg").await
+            && let Some((r, g, b, a)) = parse_rgba(&s)
+        {
+            theme.selection_bg = Rgba::new(r, g, b, a);
         }
-        if let Some(s) = get_str(&config, "search_highlight_bg").await {
-            if let Some((r, g, b, a)) = parse_rgba(&s) {
-                theme.search_highlight_bg = Rgba::new(r, g, b, a);
-            }
+        if let Some(s) = get_str(&config, "search_highlight_bg").await
+            && let Some((r, g, b, a)) = parse_rgba(&s)
+        {
+            theme.search_highlight_bg = Rgba::new(r, g, b, a);
         }
-        if let Some(s) = get_str(&config, "directory").await {
-            if let Some((r, g, b)) = parse_rgb(&s) {
-                theme.directory = Rgb::new(r, g, b);
-            }
+        if let Some(s) = get_str(&config, "directory").await
+            && let Some((r, g, b)) = parse_rgb(&s)
+        {
+            theme.directory = Rgb::new(r, g, b);
         }
-        if let Some(s) = get_str(&config, "header_bg").await {
-            if let Some((r, g, b, a)) = parse_rgba(&s) {
-                theme.header_bg = Rgba::new(r, g, b, a);
-            }
+        if let Some(s) = get_str(&config, "header_bg").await
+            && let Some((r, g, b, a)) = parse_rgba(&s)
+        {
+            theme.header_bg = Rgba::new(r, g, b, a);
         }
-        if let Some(s) = get_str(&config, "status_bg").await {
-            if let Some((r, g, b, a)) = parse_rgba(&s) {
-                theme.status_bg = Rgba::new(r, g, b, a);
-            }
+        if let Some(s) = get_str(&config, "status_bg").await
+            && let Some((r, g, b, a)) = parse_rgba(&s)
+        {
+            theme.status_bg = Rgba::new(r, g, b, a);
         }
-        if let Some(s) = get_str(&config, "border").await {
-            if let Some((r, g, b, a)) = parse_rgba(&s) {
-                theme.border = Rgba::new(r, g, b, a);
-            }
+        if let Some(s) = get_str(&config, "border").await
+            && let Some((r, g, b, a)) = parse_rgba(&s)
+        {
+            theme.border = Rgba::new(r, g, b, a);
         }
-        if let Some(s) = get_str(&config, "border_focused").await {
-            if let Some((r, g, b, a)) = parse_rgba(&s) {
-                theme.border_focused = Rgba::new(r, g, b, a);
-            }
+        if let Some(s) = get_str(&config, "border_focused").await
+            && let Some((r, g, b, a)) = parse_rgba(&s)
+        {
+            theme.border_focused = Rgba::new(r, g, b, a);
         }
 
         // Load icons
@@ -291,18 +297,13 @@ impl Theme {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum OverlayPosition {
+    #[default]
     Right,
     Left,
     Top,
     Bottom,
-}
-
-impl Default for OverlayPosition {
-    fn default() -> Self {
-        Self::Right
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -321,8 +322,8 @@ impl Dimension {
 
     fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
-        if s.ends_with('%') {
-            s[..s.len() - 1].parse::<f32>().ok().map(Dimension::Percent)
+        if let Some(stripped) = s.strip_suffix('%') {
+            stripped.parse::<f32>().ok().map(Dimension::Percent)
         } else {
             s.parse::<i32>().ok().map(Dimension::Pixels)
         }
@@ -359,15 +360,27 @@ impl Config {
     }
 
     async fn get_bool(&self, key: &str) -> Option<bool> {
-        self.inner.get(key).await.ok().and_then(|v: prefer::ConfigValue| v.as_bool())
+        self.inner
+            .get(key)
+            .await
+            .ok()
+            .and_then(|v: prefer::ConfigValue| v.as_bool())
     }
 
     async fn get_i64(&self, key: &str) -> Option<i64> {
-        self.inner.get(key).await.ok().and_then(|v: prefer::ConfigValue| v.as_i64())
+        self.inner
+            .get(key)
+            .await
+            .ok()
+            .and_then(|v: prefer::ConfigValue| v.as_i64())
     }
 
     async fn get_str(&self, key: &str) -> Option<String> {
-        self.inner.get(key).await.ok().and_then(|v: prefer::ConfigValue| v.as_str().map(|s| s.to_string()))
+        self.inner
+            .get(key)
+            .await
+            .ok()
+            .and_then(|v: prefer::ConfigValue| v.as_str().map(|s| s.to_string()))
     }
 
     pub async fn show_hidden(&self) -> bool {
@@ -505,17 +518,17 @@ impl Openers {
     /// Detect mime type: use extension if present, magic bytes otherwise
     fn detect_mime(&self, path: &std::path::Path) -> String {
         // If file has an extension, use extension-based detection
-        if path.extension().is_some() {
-            if let Some(mime) = mime_guess::from_path(path).first() {
-                return mime.to_string();
-            }
+        if path.extension().is_some()
+            && let Some(mime) = mime_guess::from_path(path).first()
+        {
+            return mime.to_string();
         }
 
         // No extension or unknown extension: try magic bytes
-        if let Ok(kind) = infer::get_from_path(path) {
-            if let Some(k) = kind {
-                return k.mime_type().to_string();
-            }
+        if let Ok(kind) = infer::get_from_path(path)
+            && let Some(k) = kind
+        {
+            return k.mime_type().to_string();
         }
 
         String::new()
@@ -528,10 +541,10 @@ impl Openers {
             return true;
         }
 
-        if let Some(prefix) = pattern.strip_suffix("/*") {
-            if let Some(mime_type) = mime.split('/').next() {
-                return mime_type == prefix;
-            }
+        if let Some(prefix) = pattern.strip_suffix("/*")
+            && let Some(mime_type) = mime.split('/').next()
+        {
+            return mime_type == prefix;
         }
 
         false
@@ -635,9 +648,9 @@ mod tests {
 
     #[test]
     fn test_parse_rgb_invalid() {
-        assert_eq!(parse_rgb("#fff"), None);  // Too short
-        assert_eq!(parse_rgb("#gggggg"), None);  // Invalid hex
-        assert_eq!(parse_rgb("not,a,color"), None);  // Invalid numbers
+        assert_eq!(parse_rgb("#fff"), None); // Too short
+        assert_eq!(parse_rgb("#gggggg"), None); // Invalid hex
+        assert_eq!(parse_rgb("not,a,color"), None); // Invalid numbers
         assert_eq!(parse_rgb(""), None);
     }
 
@@ -720,7 +733,7 @@ mod tests {
         let theme = Theme::default();
         assert_eq!(theme.background.r, 30);
         assert_eq!(theme.foreground.r, 220);
-        assert_eq!(theme.directory.r, 138);  // Royal purple
+        assert_eq!(theme.directory.r, 138); // Royal purple
         assert_eq!(theme.icon_folder, "\u{f07b}");
         assert_eq!(theme.icon_file, "\u{f15b}");
     }
@@ -745,8 +758,14 @@ mod tests {
     fn test_openers_default() {
         let openers = Openers::default();
         // Default openers should fall back to xdg-open
-        assert_eq!(openers.get_opener(std::path::Path::new("test.jpg")), "xdg-open {}");
-        assert_eq!(openers.get_opener(std::path::Path::new("test.txt")), "xdg-open {}");
+        assert_eq!(
+            openers.get_opener(std::path::Path::new("test.jpg")),
+            "xdg-open {}"
+        );
+        assert_eq!(
+            openers.get_opener(std::path::Path::new("test.txt")),
+            "xdg-open {}"
+        );
     }
 
     #[test]
@@ -775,12 +794,24 @@ mod tests {
         };
 
         // Exact match takes priority
-        assert_eq!(openers.get_opener(std::path::Path::new("test.jpg")), "feh {}");
+        assert_eq!(
+            openers.get_opener(std::path::Path::new("test.jpg")),
+            "feh {}"
+        );
         // Wildcard match
-        assert_eq!(openers.get_opener(std::path::Path::new("test.png")), "imv {}");
+        assert_eq!(
+            openers.get_opener(std::path::Path::new("test.png")),
+            "imv {}"
+        );
         // Different type wildcard
-        assert_eq!(openers.get_opener(std::path::Path::new("test.mp4")), "mpv {}");
+        assert_eq!(
+            openers.get_opener(std::path::Path::new("test.mp4")),
+            "mpv {}"
+        );
         // Fallback to xdg-open
-        assert_eq!(openers.get_opener(std::path::Path::new("test.xyz")), "xdg-open {}");
+        assert_eq!(
+            openers.get_opener(std::path::Path::new("test.xyz")),
+            "xdg-open {}"
+        );
     }
 }

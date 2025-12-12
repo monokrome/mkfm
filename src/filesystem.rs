@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
-use std::fs::{self, DirEntry};
 use std::cmp::Ordering;
-use std::time::SystemTime;
+use std::fs::{self, DirEntry};
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::SystemTime;
 
 #[derive(Clone)]
 pub struct Entry {
@@ -11,7 +11,7 @@ pub struct Entry {
     pub is_dir: bool,
     pub size: u64,
     pub modified: Option<SystemTime>,
-    pub depth: u8,  // Indentation level for inline expansion (0 = root)
+    pub depth: u8, // Indentation level for inline expansion (0 = root)
 }
 
 impl Entry {
@@ -23,7 +23,14 @@ impl Entry {
         let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
         let modified = metadata.and_then(|m| m.modified().ok());
 
-        Some(Self { name, path, is_dir, size, modified, depth: 0 })
+        Some(Self {
+            name,
+            path,
+            is_dir,
+            size,
+            modified,
+            depth: 0,
+        })
     }
 
     /// Create an entry with a specific depth (for inline expansion)
@@ -43,23 +50,24 @@ pub fn list_directory(path: &Path) -> Vec<Entry> {
         .filter_map(Entry::from_dir_entry)
         .collect();
 
-    entries.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => Ordering::Less,
-            (false, true) => Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
 
     if let Some(parent) = path.parent() {
-        entries.insert(0, Entry {
-            name: "..".to_string(),
-            path: parent.to_path_buf(),
-            is_dir: true,
-            size: 0,
-            modified: None,
-            depth: 0,
-        });
+        entries.insert(
+            0,
+            Entry {
+                name: "..".to_string(),
+                path: parent.to_path_buf(),
+                is_dir: true,
+                size: 0,
+                modified: None,
+                depth: 0,
+            },
+        );
     }
 
     entries
@@ -128,15 +136,18 @@ pub fn trash(path: &Path) -> std::io::Result<()> {
     fs::create_dir_all(&files_dir)?;
     fs::create_dir_all(&info_dir)?;
 
-    let file_name = path.file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid file name"))?;
+    let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid file name")
+    })?;
 
     // Generate unique name if file exists in trash
     let mut dest_name = file_name.to_string();
     let mut counter = 1;
     while files_dir.join(&dest_name).exists() {
-        let stem = Path::new(file_name).file_stem().and_then(|s| s.to_str()).unwrap_or(file_name);
+        let stem = Path::new(file_name)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(file_name);
         let ext = Path::new(file_name).extension().and_then(|e| e.to_str());
         dest_name = match ext {
             Some(e) => format!("{}.{}.{}", stem, counter, e),
@@ -171,7 +182,8 @@ pub fn trash(path: &Path) -> std::io::Result<()> {
 
 /// Extract an archive to the destination directory
 pub fn extract_archive(archive_path: &Path, dest_dir: &Path) -> std::io::Result<()> {
-    let ext = archive_path.extension()
+    let ext = archive_path
+        .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase());
 
@@ -179,23 +191,65 @@ pub fn extract_archive(archive_path: &Path, dest_dir: &Path) -> std::io::Result<
     let dest_str = dest_dir.to_string_lossy().to_string();
 
     let (cmd, args): (&str, Vec<String>) = match ext.as_deref() {
-        Some("zip") => ("unzip", vec!["-q".into(), file_name.clone(), "-d".into(), dest_str.clone()]),
-        Some("gz") if file_name.ends_with(".tar.gz") || file_name.ends_with(".tgz") => {
-            ("tar", vec!["-xzf".into(), file_name.clone(), "-C".into(), dest_str.clone()])
+        Some("zip") => (
+            "unzip",
+            vec![
+                "-q".into(),
+                file_name.clone(),
+                "-d".into(),
+                dest_str.clone(),
+            ],
+        ),
+        Some("gz") if file_name.ends_with(".tar.gz") || file_name.ends_with(".tgz") => (
+            "tar",
+            vec![
+                "-xzf".into(),
+                file_name.clone(),
+                "-C".into(),
+                dest_str.clone(),
+            ],
+        ),
+        Some("bz2") if file_name.ends_with(".tar.bz2") => (
+            "tar",
+            vec![
+                "-xjf".into(),
+                file_name.clone(),
+                "-C".into(),
+                dest_str.clone(),
+            ],
+        ),
+        Some("xz") if file_name.ends_with(".tar.xz") => (
+            "tar",
+            vec![
+                "-xJf".into(),
+                file_name.clone(),
+                "-C".into(),
+                dest_str.clone(),
+            ],
+        ),
+        Some("tar") => (
+            "tar",
+            vec![
+                "-xf".into(),
+                file_name.clone(),
+                "-C".into(),
+                dest_str.clone(),
+            ],
+        ),
+        Some("7z") => (
+            "7z",
+            vec!["x".into(), format!("-o{}", dest_str), file_name.clone()],
+        ),
+        Some("rar") => (
+            "unrar",
+            vec!["x".into(), file_name.clone(), dest_str.clone()],
+        ),
+        _ => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "unsupported archive format",
+            ));
         }
-        Some("bz2") if file_name.ends_with(".tar.bz2") => {
-            ("tar", vec!["-xjf".into(), file_name.clone(), "-C".into(), dest_str.clone()])
-        }
-        Some("xz") if file_name.ends_with(".tar.xz") => {
-            ("tar", vec!["-xJf".into(), file_name.clone(), "-C".into(), dest_str.clone()])
-        }
-        Some("tar") => ("tar", vec!["-xf".into(), file_name.clone(), "-C".into(), dest_str.clone()]),
-        Some("7z") => ("7z", vec!["x".into(), format!("-o{}", dest_str), file_name.clone()]),
-        Some("rar") => ("unrar", vec!["x".into(), file_name.clone(), dest_str.clone()]),
-        _ => return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "unsupported archive format"
-        )),
     };
 
     let status = std::process::Command::new(cmd)
@@ -208,7 +262,7 @@ pub fn extract_archive(archive_path: &Path, dest_dir: &Path) -> std::io::Result<
     if status.success() {
         Ok(())
     } else {
-        Err(std::io::Error::new(std::io::ErrorKind::Other, "extraction failed"))
+        Err(std::io::Error::other("extraction failed"))
     }
 }
 
@@ -226,7 +280,7 @@ pub fn chmod(path: &Path, mode: &str) -> std::io::Result<()> {
         // For now, just support octal. Symbolic mode parsing is complex.
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "only octal modes supported (e.g., 755)"
+            "only octal modes supported (e.g., 755)",
         ));
     };
 
@@ -238,14 +292,15 @@ pub fn chmod(path: &Path, mode: &str) -> std::io::Result<()> {
 pub fn chmod(_path: &Path, _mode: &str) -> std::io::Result<()> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,
-        "chmod not supported on this platform"
+        "chmod not supported on this platform",
     ))
 }
 
 /// Create a symbolic link
 pub fn create_symlink(src: &Path, dest_dir: &Path) -> std::io::Result<()> {
-    let file_name = src.file_name()
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid source path"))?;
+    let file_name = src.file_name().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid source path")
+    })?;
     let dest = dest_dir.join(file_name);
 
     #[cfg(unix)]
@@ -267,21 +322,30 @@ pub fn create_symlink(src: &Path, dest_dir: &Path) -> std::io::Result<()> {
 #[derive(Clone)]
 pub struct ArchiveEntry {
     pub name: String,
-    pub full_path: String,  // Path within archive
+    pub full_path: String, // Path within archive
     pub is_dir: bool,
     pub size: u64,
 }
 
 /// Check if a file is a supported archive
 pub fn is_archive(path: &Path) -> bool {
-    let ext = path.extension()
+    let ext = path
+        .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase());
 
     let name = path.to_string_lossy().to_lowercase();
 
-    matches!(ext.as_deref(), Some("zip") | Some("tar") | Some("gz") | Some("bz2") | Some("xz") | Some("7z") | Some("rar"))
-        || name.ends_with(".tar.gz")
+    matches!(
+        ext.as_deref(),
+        Some("zip")
+            | Some("tar")
+            | Some("gz")
+            | Some("bz2")
+            | Some("xz")
+            | Some("7z")
+            | Some("rar")
+    ) || name.ends_with(".tar.gz")
         || name.ends_with(".tar.bz2")
         || name.ends_with(".tar.xz")
         || name.ends_with(".tgz")
@@ -289,7 +353,8 @@ pub fn is_archive(path: &Path) -> bool {
 
 /// List contents of an archive
 pub fn list_archive(archive_path: &Path) -> Vec<ArchiveEntry> {
-    let ext = archive_path.extension()
+    let ext = archive_path
+        .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase());
 
@@ -319,8 +384,12 @@ fn list_zip(path: &Path) -> Vec<ArchiveEntry> {
         .args(["-l", &path.to_string_lossy()])
         .output();
 
-    let Ok(output) = output else { return Vec::new() };
-    let Ok(stdout) = String::from_utf8(output.stdout) else { return Vec::new() };
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    let Ok(stdout) = String::from_utf8(output.stdout) else {
+        return Vec::new();
+    };
 
     let mut entries = Vec::new();
 
@@ -335,7 +404,11 @@ fn list_zip(path: &Path) -> Vec<ArchiveEntry> {
                 let is_dir = name.ends_with('/');
                 let clean_name = name.trim_end_matches('/').to_string();
                 entries.push(ArchiveEntry {
-                    name: clean_name.split('/').last().unwrap_or(&clean_name).to_string(),
+                    name: clean_name
+                        .split('/')
+                        .next_back()
+                        .unwrap_or(&clean_name)
+                        .to_string(),
                     full_path: clean_name,
                     is_dir,
                     size,
@@ -353,8 +426,12 @@ fn list_tar(path: &Path, compression: &str) -> Vec<ArchiveEntry> {
         .args([&flag, &path.to_string_lossy().to_string()])
         .output();
 
-    let Ok(output) = output else { return Vec::new() };
-    let Ok(stdout) = String::from_utf8(output.stdout) else { return Vec::new() };
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    let Ok(stdout) = String::from_utf8(output.stdout) else {
+        return Vec::new();
+    };
 
     let mut entries = Vec::new();
 
@@ -369,7 +446,11 @@ fn list_tar(path: &Path, compression: &str) -> Vec<ArchiveEntry> {
             if !name.is_empty() {
                 let clean_name = name.trim_end_matches('/').to_string();
                 entries.push(ArchiveEntry {
-                    name: clean_name.split('/').last().unwrap_or(&clean_name).to_string(),
+                    name: clean_name
+                        .split('/')
+                        .next_back()
+                        .unwrap_or(&clean_name)
+                        .to_string(),
                     full_path: clean_name,
                     is_dir,
                     size,
@@ -383,11 +464,15 @@ fn list_tar(path: &Path, compression: &str) -> Vec<ArchiveEntry> {
 
 fn list_7z(path: &Path) -> Vec<ArchiveEntry> {
     let output = Command::new("7z")
-        .args(["l", "-slt", &path.to_string_lossy().to_string()])
+        .args(["l", "-slt", path.to_string_lossy().as_ref()])
         .output();
 
-    let Ok(output) = output else { return Vec::new() };
-    let Ok(stdout) = String::from_utf8(output.stdout) else { return Vec::new() };
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    let Ok(stdout) = String::from_utf8(output.stdout) else {
+        return Vec::new();
+    };
 
     let mut entries = Vec::new();
     let mut current_path = String::new();
@@ -398,7 +483,11 @@ fn list_7z(path: &Path) -> Vec<ArchiveEntry> {
         if let Some(p) = line.strip_prefix("Path = ") {
             if !current_path.is_empty() {
                 entries.push(ArchiveEntry {
-                    name: current_path.split('/').last().unwrap_or(&current_path).to_string(),
+                    name: current_path
+                        .split('/')
+                        .next_back()
+                        .unwrap_or(&current_path)
+                        .to_string(),
                     full_path: current_path.clone(),
                     is_dir: current_is_dir,
                     size: current_size,
@@ -417,7 +506,11 @@ fn list_7z(path: &Path) -> Vec<ArchiveEntry> {
     // Don't forget the last entry
     if !current_path.is_empty() {
         entries.push(ArchiveEntry {
-            name: current_path.split('/').last().unwrap_or(&current_path).to_string(),
+            name: current_path
+                .split('/')
+                .next_back()
+                .unwrap_or(&current_path)
+                .to_string(),
             full_path: current_path,
             is_dir: current_is_dir,
             size: current_size,
@@ -429,11 +522,15 @@ fn list_7z(path: &Path) -> Vec<ArchiveEntry> {
 
 fn list_rar(path: &Path) -> Vec<ArchiveEntry> {
     let output = Command::new("unrar")
-        .args(["l", &path.to_string_lossy().to_string()])
+        .args(["l", path.to_string_lossy().as_ref()])
         .output();
 
-    let Ok(output) = output else { return Vec::new() };
-    let Ok(stdout) = String::from_utf8(output.stdout) else { return Vec::new() };
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    let Ok(stdout) = String::from_utf8(output.stdout) else {
+        return Vec::new();
+    };
 
     let mut entries = Vec::new();
 
@@ -444,7 +541,9 @@ fn list_rar(path: &Path) -> Vec<ArchiveEntry> {
             in_files = !in_files;
             continue;
         }
-        if !in_files { continue; }
+        if !in_files {
+            continue;
+        }
 
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 5 {
@@ -455,7 +554,11 @@ fn list_rar(path: &Path) -> Vec<ArchiveEntry> {
             if !name.is_empty() {
                 let clean_name = name.trim_end_matches('/').to_string();
                 entries.push(ArchiveEntry {
-                    name: clean_name.split('/').last().unwrap_or(&clean_name).to_string(),
+                    name: clean_name
+                        .split('/')
+                        .next_back()
+                        .unwrap_or(&clean_name)
+                        .to_string(),
                     full_path: clean_name,
                     is_dir,
                     size,
@@ -473,7 +576,8 @@ pub fn extract_files_from_archive(
     files: &[String],
     dest_dir: &Path,
 ) -> std::io::Result<()> {
-    let ext = archive_path.extension()
+    let ext = archive_path
+        .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase());
 
@@ -512,12 +616,12 @@ pub fn extract_files_from_archive(
     } else {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "unsupported archive format"
+            "unsupported archive format",
         ));
     };
 
     match status {
         Ok(s) if s.success() => Ok(()),
-        _ => Err(std::io::Error::new(std::io::ErrorKind::Other, "extraction failed")),
+        _ => Err(std::io::Error::other("extraction failed")),
     }
 }
