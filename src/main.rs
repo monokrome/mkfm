@@ -269,16 +269,16 @@ impl App {
     fn init_features(&mut self, has_data_device: bool, has_seat: bool) {
         use features::*;
 
-        // Vim mode - always available, just a config option
+        // Vi mode - always available, just a config option
         if self.vi_mode {
             self.feature_list.add(Feature::available(
-                FEATURE_VIM_MODE,
-                "Vim-style keybindings (j/k/h/l, gg, G, etc.)",
+                FEATURE_VI_MODE,
+                "Vi-style keybindings (j/k/h/l, gg, G, etc.)",
             ));
         } else {
             self.feature_list.add(Feature::available(
-                FEATURE_VIM_MODE,
-                "Vim-style keybindings (disabled, set vi=true in config)",
+                FEATURE_VI_MODE,
+                "Vi-style keybindings (disabled, set vi=true in config)",
             ));
         }
 

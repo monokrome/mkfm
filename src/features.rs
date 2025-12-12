@@ -114,4 +114,4 @@ pub const FEATURE_CLIPBOARD: &str = "Clipboard";
 pub const FEATURE_PREVIEW: &str = "File Preview";
 pub const FEATURE_ARCHIVE: &str = "Archive Support";
 pub const FEATURE_TRASH: &str = "Trash";
-pub const FEATURE_VIM_MODE: &str = "Vim Mode";
+pub const FEATURE_VI_MODE: &str = "Vi Mode";
