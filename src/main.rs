@@ -288,7 +288,7 @@ impl App {
     }
 
     /// Initialize feature availability based on mkframe capabilities
-    fn init_features(&mut self, has_data_device: bool, has_seat: bool) {
+    fn init_features(&mut self, has_data_device: bool, has_seat: bool, has_attached_surface: bool) {
         use features::*;
 
         // Vi mode - always available, just a config option
@@ -329,6 +329,20 @@ impl App {
             FEATURE_PREVIEW,
             "Preview images and text files in overlay",
         ));
+
+        // Overlay extend - attached surfaces for overlay positioning beyond window
+        if has_attached_surface {
+            self.feature_list.add(Feature::available(
+                FEATURE_OVERLAY_EXTEND,
+                "Overlay can extend beyond window bounds (wlr-attached-surface)",
+            ));
+        } else {
+            self.feature_list.add(Feature::unavailable(
+                FEATURE_OVERLAY_EXTEND,
+                "Overlay can extend beyond window bounds",
+                "Compositor does not support wlr-attached-surface protocol. Overlay will use subsurfaces (limited positioning).",
+            ));
+        }
 
         // Archive support - check if tools are available
         let has_tar = std::process::Command::new("tar")
@@ -2653,7 +2667,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let qh = event_queue.handle();
 
     // Initialize feature availability based on mkframe capabilities
-    app.init_features(mkapp.has_data_device(), mkapp.has_seat());
+    app.init_features(
+        mkapp.has_data_device(),
+        mkapp.has_seat(),
+        mkapp.has_attached_surface(),
+    );
 
     let window_id = mkapp.create_window_full(&qh, "mkfm", Some("mkfm"), 800, 600, decorations);
     let mut needs_redraw = true;

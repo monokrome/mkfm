@@ -116,6 +116,7 @@ impl FeatureListPane {
 pub const FEATURE_DRAG_DROP: &str = "Drag & Drop";
 pub const FEATURE_CLIPBOARD: &str = "Clipboard";
 pub const FEATURE_PREVIEW: &str = "File Preview";
+pub const FEATURE_OVERLAY_EXTEND: &str = "Overlay Extend";
 pub const FEATURE_ARCHIVE: &str = "Archive Support";
 pub const FEATURE_TRASH: &str = "Trash";
 pub const FEATURE_VI_MODE: &str = "Vi Mode";
