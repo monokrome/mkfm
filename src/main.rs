@@ -1699,57 +1699,17 @@ fn render(canvas: &mut Canvas, text_renderer: &mut TextRenderer, app: &App, them
     let width = canvas.width();
     let height = canvas.height();
 
-    // Colors from theme
-    let bg_color = Color::from_rgba8(
-        theme.background.r,
-        theme.background.g,
-        theme.background.b,
-        theme.background.a,
-    );
-    let fg_color = TextColor::rgb(theme.foreground.r, theme.foreground.g, theme.foreground.b);
-    let cursor_bg = Color::from_rgba8(
-        theme.cursor_bg.r,
-        theme.cursor_bg.g,
-        theme.cursor_bg.b,
-        theme.cursor_bg.a,
-    );
-    let selected_bg = Color::from_rgba8(
-        theme.selection_bg.r,
-        theme.selection_bg.g,
-        theme.selection_bg.b,
-        theme.selection_bg.a,
-    );
-    let search_highlight_bg = Color::from_rgba8(
-        theme.search_highlight_bg.r,
-        theme.search_highlight_bg.g,
-        theme.search_highlight_bg.b,
-        theme.search_highlight_bg.a,
-    );
-    let dir_color = TextColor::rgb(theme.directory.r, theme.directory.g, theme.directory.b);
-    let header_bg = Color::from_rgba8(
-        theme.header_bg.r,
-        theme.header_bg.g,
-        theme.header_bg.b,
-        theme.header_bg.a,
-    );
-    let status_bg = Color::from_rgba8(
-        theme.status_bg.r,
-        theme.status_bg.g,
-        theme.status_bg.b,
-        theme.status_bg.a,
-    );
-    let border_color = Color::from_rgba8(
-        theme.border.r,
-        theme.border.g,
-        theme.border.b,
-        theme.border.a,
-    );
-    let focused_border = Color::from_rgba8(
-        theme.border_focused.r,
-        theme.border_focused.g,
-        theme.border_focused.b,
-        theme.border_focused.a,
-    );
+    // Convert theme colors once
+    let bg_color = theme.background.to_color();
+    let fg_color = theme.foreground.to_text_color();
+    let cursor_bg = theme.cursor_bg.to_color();
+    let selected_bg = theme.selection_bg.to_color();
+    let search_highlight_bg = theme.search_highlight_bg.to_color();
+    let dir_color = theme.directory.to_text_color();
+    let header_bg = theme.header_bg.to_color();
+    let status_bg = theme.status_bg.to_color();
+    let border_color = theme.border.to_color();
+    let focused_border = theme.border_focused.to_color();
 
     // Clear background
     canvas.clear(bg_color);

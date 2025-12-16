@@ -54,3 +54,25 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --release -- -D warnings
+
+      - name: Install scc
+        run: |
+          curl -sL https://github.com/boyter/scc/releases/download/v3.2.0/scc_Linux_x86_64.tar.gz | tar xz
+          chmod +x scc
+
+      - name: Check cyclomatic complexity
+        run: |
+          echo "## Complexity Report" >> $GITHUB_STEP_SUMMARY
+          ./scc --by-file --sort complexity src | tee complexity.txt
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat complexity.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Fail if any file exceeds complexity threshold of 100
+          MAX_COMPLEXITY=100
+          if ./scc --by-file --format json src | jq -e ".[] | .Files[]? | select(.Complexity > $MAX_COMPLEXITY)" > /dev/null 2>&1; then
+            echo "::error::Files with complexity > $MAX_COMPLEXITY detected!"
+            ./scc --by-file --format json src | jq -r ".[] | .Files[]? | select(.Complexity > $MAX_COMPLEXITY) | \"\(.Location): complexity \(.Complexity)\""
+            exit 1
+          fi
+          echo "All files within complexity threshold ($MAX_COMPLEXITY)"

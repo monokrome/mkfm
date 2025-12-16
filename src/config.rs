@@ -1,3 +1,4 @@
+use mkframe::{Color, TextColor};
 use prefer::Config as PreferConfig;
 use std::io::Write;
 use std::path::PathBuf;
@@ -94,6 +95,10 @@ impl Rgb {
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }
+
+    pub fn to_text_color(self) -> TextColor {
+        TextColor::rgb(self.r, self.g, self.b)
+    }
 }
 
 /// RGBA color for theme
@@ -108,6 +113,10 @@ pub struct Rgba {
 impl Rgba {
     pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
+    }
+
+    pub fn to_color(self) -> Color {
+        Color::from_rgba8(self.r, self.g, self.b, self.a)
     }
 }
 
