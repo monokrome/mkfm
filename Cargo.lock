@@ -1235,7 +1235,7 @@ dependencies = [
 
 [[package]]
 name = "mkfm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dirs",
  "image",
@@ -1253,9 +1253,9 @@ dependencies = [
 
 [[package]]
 name = "mkframe"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2f9605991e58cb80ed72c3916a5a9638aa768f31496767efe874f488e04e69a"
+checksum = "50d061a22183dfd0d8bcad472b529eee0e89d48ce1f525f6c687f4064c0b77f7"
 dependencies = [
  "bytemuck",
  "cosmic-text",

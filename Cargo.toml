@@ -1,13 +1,13 @@
 [package]
 name = "mkfm"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A minimal file manager with vim-like modal keybindings"
 license = "GPL-3.0"
 
 [dependencies]
 # UI toolkit
-mkframe = "0.1"
+mkframe = "0.1.1"
 
 # Image loading and EXIF
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
