@@ -44,8 +44,54 @@ impl PreviewContent {
     }
 }
 
+fn load_svg_preview(
+    path: &std::path::Path,
+    max_width: u32,
+    max_height: u32,
+) -> Result<PreviewContent, Box<dyn std::error::Error>> {
+    let svg_data = std::fs::read(path)?;
+    let tree = resvg::usvg::Tree::from_data(&svg_data, &resvg::usvg::Options::default())?;
+
+    let svg_size = tree.size();
+    let svg_w = svg_size.width();
+    let svg_h = svg_size.height();
+
+    // Calculate scale to fit within max dimensions
+    let scale_x = max_width as f32 / svg_w;
+    let scale_y = max_height as f32 / svg_h;
+    let scale = scale_x.min(scale_y).min(1.0);
+
+    let target_w = (svg_w * scale).round() as u32;
+    let target_h = (svg_h * scale).round() as u32;
+
+    // Create pixmap and render
+    let mut pixmap =
+        resvg::tiny_skia::Pixmap::new(target_w, target_h).ok_or("Failed to create pixmap")?;
+
+    let transform = resvg::tiny_skia::Transform::from_scale(scale, scale);
+    resvg::render(&tree, transform, &mut pixmap.as_mut());
+
+    // Convert from RGBA premultiplied to straight alpha
+    let data: Vec<u8> = pixmap
+        .pixels()
+        .iter()
+        .flat_map(|p| [p.red(), p.green(), p.blue(), p.alpha()])
+        .collect();
+
+    Ok(PreviewContent::Image {
+        data,
+        width: target_w,
+        height: target_h,
+    })
+}
+
 fn load_preview_content(path: &std::path::Path, max_width: u32, max_height: u32) -> PreviewContent {
-    if is_image_file(path) {
+    if is_svg_file(path) {
+        match load_svg_preview(path, max_width, max_height) {
+            Ok(content) => content,
+            Err(e) => PreviewContent::Error(format!("SVG load failed: {}", e)),
+        }
+    } else if is_image_file(path) {
         match image::open(path) {
             Ok(img) => {
                 let (img_w, img_h) = img.dimensions();
@@ -2491,7 +2537,17 @@ fn is_image_file(path: &std::path::Path) -> bool {
             .and_then(|e| e.to_str())
             .map(|e| e.to_lowercase())
             .as_deref(),
-        Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp")
+        Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "svg")
+    )
+}
+
+fn is_svg_file(path: &std::path::Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .as_deref(),
+        Some("svg")
     )
 }
 

@@ -12,6 +12,7 @@ mkframe = "0.1"
 # Image loading and EXIF
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 kamadak-exif = "0.6"
+resvg = "0.45"
 
 # System
 libc = "0.2"
