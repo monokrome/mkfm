@@ -68,8 +68,8 @@ jobs:
           cat complexity.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-          # Fail if any file exceeds complexity threshold of 100
-          MAX_COMPLEXITY=100
+          # Fail if any file exceeds complexity threshold of 30
+          MAX_COMPLEXITY=30
           if ./scc --by-file --format json src | jq -e ".[] | .Files[]? | select(.Complexity > $MAX_COMPLEXITY)" > /dev/null 2>&1; then
             echo "::error::Files with complexity > $MAX_COMPLEXITY detected!"
             ./scc --by-file --format json src | jq -r ".[] | .Files[]? | select(.Complexity > $MAX_COMPLEXITY) | \"\(.Location): complexity \(.Complexity)\""
