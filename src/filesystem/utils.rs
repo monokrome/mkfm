@@ -25,22 +25,20 @@ pub fn trash(path: &Path) -> std::io::Result<()> {
     // Try trash-put first (trash-cli)
     let result = Command::new("trash-put").arg(path).status();
 
-    if let Ok(status) = result {
-        if status.success() {
+    if let Ok(status) = result
+        && status.success() {
             return Ok(());
         }
-    }
 
     // Fall back to gio trash
     let result = Command::new("gio")
         .args(["trash", &path.to_string_lossy()])
         .status();
 
-    if let Ok(status) = result {
-        if status.success() {
+    if let Ok(status) = result
+        && status.success() {
             return Ok(());
         }
-    }
 
     // Fall back to moving to XDG trash
     let trash_dir = std::env::var("XDG_DATA_HOME")
