@@ -72,12 +72,7 @@ impl App {
         }
     }
 
-    fn compute_click_target(
-        &mut self,
-        bounds: Rect,
-        x: f64,
-        y: f64,
-    ) -> Option<(usize, bool)> {
+    fn compute_click_target(&mut self, bounds: Rect, x: f64, y: f64) -> Option<(usize, bool)> {
         let line_height = 24i32;
         let header_height = 32i32;
 

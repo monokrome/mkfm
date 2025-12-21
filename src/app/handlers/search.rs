@@ -55,7 +55,11 @@ impl App {
         // First, search from pre_search_cursor forward
         if let Some(browser) = self.browser() {
             for i in pre_cursor..browser.entries.len() {
-                if browser.entries[i].name.to_lowercase().contains(&pattern_lower) {
+                if browser.entries[i]
+                    .name
+                    .to_lowercase()
+                    .contains(&pattern_lower)
+                {
                     if let Some(b) = self.browser_mut() {
                         b.cursor = i;
                     }
@@ -67,7 +71,11 @@ impl App {
         // Then wrap around from beginning to pre_cursor
         if let Some(browser) = self.browser() {
             for i in 0..pre_cursor {
-                if browser.entries[i].name.to_lowercase().contains(&pattern_lower) {
+                if browser.entries[i]
+                    .name
+                    .to_lowercase()
+                    .contains(&pattern_lower)
+                {
                     if let Some(b) = self.browser_mut() {
                         b.cursor = i;
                     }

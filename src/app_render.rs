@@ -8,12 +8,7 @@ use crate::jobs::Job;
 use crate::render;
 
 /// Render the entire application UI
-pub fn render_app(
-    canvas: &mut Canvas,
-    text_renderer: &mut TextRenderer,
-    app: &App,
-    theme: &Theme,
-) {
+pub fn render_app(canvas: &mut Canvas, text_renderer: &mut TextRenderer, app: &App, theme: &Theme) {
     let width = canvas.width();
     let height = canvas.height();
 
@@ -27,10 +22,28 @@ pub fn render_app(
         .saturating_sub(layout.status_height as u32)
         .saturating_sub(list_pane_height);
 
-    render_split_panes(canvas, text_renderer, app, theme, &colors, &layout, width, main_content_height);
+    render_split_panes(
+        canvas,
+        text_renderer,
+        app,
+        theme,
+        &colors,
+        &layout,
+        width,
+        main_content_height,
+    );
 
     if app.task_list.visible || app.error_list.visible {
-        render_task_pane(canvas, text_renderer, app, &colors, &layout, main_content_height, width, list_pane_height);
+        render_task_pane(
+            canvas,
+            text_renderer,
+            app,
+            &colors,
+            &layout,
+            main_content_height,
+            width,
+            list_pane_height,
+        );
     }
 
     if app.feature_pane.visible {
@@ -71,26 +84,27 @@ fn render_split_panes(
     height: u32,
 ) {
     let bounds = Rect::new(0, 0, width, height);
-    app.splits.render(bounds, |_leaf_id, pane_rect, browser, is_focused| {
-        let focused = is_focused && app.focus_area == FocusArea::Splits;
-        render::render_browser_pane(
-            canvas,
-            text_renderer,
-            browser,
-            &app.selection,
-            app.search_highlight,
-            &app.search_matches,
-            theme,
-            pane_rect.x,
-            pane_rect.y,
-            pane_rect.width,
-            pane_rect.height,
-            focused,
-            colors,
-            layout,
-            app.icons_enabled,
-        );
-    });
+    app.splits
+        .render(bounds, |_leaf_id, pane_rect, browser, is_focused| {
+            let focused = is_focused && app.focus_area == FocusArea::Splits;
+            render::render_browser_pane(
+                canvas,
+                text_renderer,
+                browser,
+                &app.selection,
+                app.search_highlight,
+                &app.search_matches,
+                theme,
+                pane_rect.x,
+                pane_rect.y,
+                pane_rect.width,
+                pane_rect.height,
+                focused,
+                colors,
+                layout,
+                app.icons_enabled,
+            );
+        });
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -133,7 +147,10 @@ fn prepare_task_pane_data(app: &App) -> (Vec<&Job>, usize, &'static str, &'stati
         )
     } else if app.task_list.visible && !app.error_list.visible {
         (
-            all_jobs.iter().filter(|j| j.is_active() || j.is_complete()).collect(),
+            all_jobs
+                .iter()
+                .filter(|j| j.is_active() || j.is_complete())
+                .collect(),
             app.task_list.cursor,
             "Tasks",
             "No active tasks",

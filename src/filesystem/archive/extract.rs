@@ -21,22 +21,33 @@ fn build_extract_args(
     dest: &str,
 ) -> std::io::Result<(&'static str, Vec<String>)> {
     let result = match format {
-        ArchiveFormat::Zip => ("unzip", vec!["-q".into(), file.into(), "-d".into(), dest.into()]),
-        ArchiveFormat::TarGz => ("tar", vec!["-xzf".into(), file.into(), "-C".into(), dest.into()]),
-        ArchiveFormat::TarBz2 => {
-            ("tar", vec!["-xjf".into(), file.into(), "-C".into(), dest.into()])
-        }
-        ArchiveFormat::TarXz => {
-            ("tar", vec!["-xJf".into(), file.into(), "-C".into(), dest.into()])
-        }
-        ArchiveFormat::Tar => ("tar", vec!["-xf".into(), file.into(), "-C".into(), dest.into()]),
+        ArchiveFormat::Zip => (
+            "unzip",
+            vec!["-q".into(), file.into(), "-d".into(), dest.into()],
+        ),
+        ArchiveFormat::TarGz => (
+            "tar",
+            vec!["-xzf".into(), file.into(), "-C".into(), dest.into()],
+        ),
+        ArchiveFormat::TarBz2 => (
+            "tar",
+            vec!["-xjf".into(), file.into(), "-C".into(), dest.into()],
+        ),
+        ArchiveFormat::TarXz => (
+            "tar",
+            vec!["-xJf".into(), file.into(), "-C".into(), dest.into()],
+        ),
+        ArchiveFormat::Tar => (
+            "tar",
+            vec!["-xf".into(), file.into(), "-C".into(), dest.into()],
+        ),
         ArchiveFormat::SevenZip => ("7z", vec!["x".into(), format!("-o{}", dest), file.into()]),
         ArchiveFormat::Rar => ("unrar", vec!["x".into(), file.into(), dest.into()]),
         ArchiveFormat::Unknown => {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "unsupported archive format",
-            ))
+            ));
         }
     };
     Ok(result)

@@ -66,7 +66,14 @@ pub fn render_browser_pane(
 
     let header_text = browser_header_text(browser);
     draw_header(
-        canvas, tr, inner_x, inner_y, inner_w, &header_text, colors, layout,
+        canvas,
+        tr,
+        inner_x,
+        inner_y,
+        inner_w,
+        &header_text,
+        colors,
+        layout,
     );
 
     let list_y = inner_y + layout.header_height;
@@ -80,7 +87,9 @@ pub fn render_browser_pane(
         theme,
         icons_enabled,
     };
-    render_file_list(canvas, tr, &ctx, inner_x, list_y, inner_w, list_h, colors, layout);
+    render_file_list(
+        canvas, tr, &ctx, inner_x, list_y, inner_w, list_h, colors, layout,
+    );
 }
 
 /// Render a file list within the given bounds
@@ -181,11 +190,27 @@ fn render_file_entry(
         row_w,
         layout.line_height as u32,
     );
-    draw_text(canvas, tr, &display, rect, layout.font_size, color, HAlign::Left);
+    draw_text(
+        canvas,
+        tr,
+        &display,
+        rect,
+        layout.font_size,
+        color,
+        HAlign::Left,
+    );
 
     if !entry.is_dir {
         let size_str = filesystem::format_size(entry.size);
-        draw_text(canvas, tr, &size_str, rect, layout.font_size, colors.fg, HAlign::Right);
+        draw_text(
+            canvas,
+            tr,
+            &size_str,
+            rect,
+            layout.font_size,
+            colors.fg,
+            HAlign::Right,
+        );
     }
 }
 

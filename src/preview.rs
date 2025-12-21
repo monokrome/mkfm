@@ -84,11 +84,20 @@ impl PreviewContent {
                 let width = (max_line_len * char_width).min(max_width);
                 (width.max(100), height.max(50))
             }
-            PreviewContent::Media { thumb_width, thumb_height, metadata, .. } => {
+            PreviewContent::Media {
+                thumb_width,
+                thumb_height,
+                metadata,
+                ..
+            } => {
                 // For media, use thumbnail size or metadata size, with space for info
                 let info_height = 80u32; // Space for metadata text
                 let base_w = if *thumb_width > 0 { *thumb_width } else { 300 };
-                let base_h = if *thumb_height > 0 { *thumb_height + info_height } else { info_height + 50 };
+                let base_h = if *thumb_height > 0 {
+                    *thumb_height + info_height
+                } else {
+                    info_height + 50
+                };
                 let w = base_w.min(max_width).max(200);
                 let h = if metadata.width.is_some() {
                     base_h.min(max_height)
@@ -475,15 +484,42 @@ fn render_media_preview(
 
     // Draw title/artist/album if available
     if let Some(ref title) = metadata.title {
-        draw_metadata_line(canvas, text_renderer, title, padding, &mut y, width, font_size, line_height);
+        draw_metadata_line(
+            canvas,
+            text_renderer,
+            title,
+            padding,
+            &mut y,
+            width,
+            font_size,
+            line_height,
+        );
     }
     if let Some(ref artist) = metadata.artist {
         let artist_text = format!("by {}", artist);
-        draw_metadata_line(canvas, text_renderer, &artist_text, padding, &mut y, width, font_size, line_height);
+        draw_metadata_line(
+            canvas,
+            text_renderer,
+            &artist_text,
+            padding,
+            &mut y,
+            width,
+            font_size,
+            line_height,
+        );
     }
     if let Some(ref album) = metadata.album {
         let album_text = format!("on {}", album);
-        draw_metadata_line(canvas, text_renderer, &album_text, padding, &mut y, width, font_size, line_height);
+        draw_metadata_line(
+            canvas,
+            text_renderer,
+            &album_text,
+            padding,
+            &mut y,
+            width,
+            font_size,
+            line_height,
+        );
     }
 
     y += 4;
@@ -491,7 +527,16 @@ fn render_media_preview(
     // Draw duration
     if let Some(duration) = metadata.format_duration() {
         let duration_text = format!("Duration: {}", duration);
-        draw_metadata_line(canvas, text_renderer, &duration_text, padding, &mut y, width, font_size, line_height);
+        draw_metadata_line(
+            canvas,
+            text_renderer,
+            &duration_text,
+            padding,
+            &mut y,
+            width,
+            font_size,
+            line_height,
+        );
     }
 
     // Draw codec/bitrate
@@ -500,13 +545,31 @@ fn render_media_preview(
         if let Some(br) = metadata.bitrate {
             info.push_str(&format!(" @ {} kbps", br / 1000));
         }
-        draw_metadata_line(canvas, text_renderer, &info, padding, &mut y, width, font_size, line_height);
+        draw_metadata_line(
+            canvas,
+            text_renderer,
+            &info,
+            padding,
+            &mut y,
+            width,
+            font_size,
+            line_height,
+        );
     }
 
     // Draw dimensions for video
     if let (Some(w), Some(h)) = (metadata.width, metadata.height) {
         let dims = format!("{}x{}", w, h);
-        draw_metadata_line(canvas, text_renderer, &dims, padding, &mut y, width, font_size, line_height);
+        draw_metadata_line(
+            canvas,
+            text_renderer,
+            &dims,
+            padding,
+            &mut y,
+            width,
+            font_size,
+            line_height,
+        );
     }
 
     // Draw audio info
@@ -515,7 +578,16 @@ fn render_media_preview(
         if let Some(ch) = metadata.channels {
             audio_info.push_str(&format!(", {} ch", ch));
         }
-        draw_metadata_line(canvas, text_renderer, &audio_info, padding, &mut y, width, font_size, line_height);
+        draw_metadata_line(
+            canvas,
+            text_renderer,
+            &audio_info,
+            padding,
+            &mut y,
+            width,
+            font_size,
+            line_height,
+        );
     }
 }
 

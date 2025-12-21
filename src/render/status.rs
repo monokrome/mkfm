@@ -72,7 +72,15 @@ fn render_command_mode(
     layout: &RenderLayout,
 ) {
     let text = format!(":{}", buffer);
-    draw_text(canvas, tr, &text, rect, layout.font_size, colors.fg, HAlign::Left);
+    draw_text(
+        canvas,
+        tr,
+        &text,
+        rect,
+        layout.font_size,
+        colors.fg,
+        HAlign::Left,
+    );
 }
 
 fn render_search_mode(
@@ -84,7 +92,15 @@ fn render_search_mode(
     layout: &RenderLayout,
 ) {
     let text = format!("/{}", buffer);
-    draw_text(canvas, tr, &text, rect, layout.font_size, colors.fg, HAlign::Left);
+    draw_text(
+        canvas,
+        tr,
+        &text,
+        rect,
+        layout.font_size,
+        colors.fg,
+        HAlign::Left,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -103,17 +119,40 @@ fn render_normal_mode(
     colors: &RenderColors,
     layout: &RenderLayout,
 ) {
-    draw_text(canvas, tr, mode.display(), rect, layout.font_size, colors.fg, HAlign::Left);
+    draw_text(
+        canvas,
+        tr,
+        mode.display(),
+        rect,
+        layout.font_size,
+        colors.fg,
+        HAlign::Left,
+    );
 
-    if search_highlight
-        && let Some(pattern) = last_search {
-            let info = format_search_info(pattern, search_matches, current_match);
-            draw_text(canvas, tr, &info, rect, layout.font_size, colors.fg, HAlign::Center);
-        }
+    if search_highlight && let Some(pattern) = last_search {
+        let info = format_search_info(pattern, search_matches, current_match);
+        draw_text(
+            canvas,
+            tr,
+            &info,
+            rect,
+            layout.font_size,
+            colors.fg,
+            HAlign::Center,
+        );
+    }
 
     let right = format_right_status(active_jobs, failed_jobs, cursor_info);
     if !right.is_empty() {
-        draw_text(canvas, tr, &right, rect, layout.font_size, colors.fg, HAlign::Right);
+        draw_text(
+            canvas,
+            tr,
+            &right,
+            rect,
+            layout.font_size,
+            colors.fg,
+            HAlign::Right,
+        );
     }
 }
 

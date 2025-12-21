@@ -8,7 +8,11 @@ pub struct PointerLayout {
 }
 
 impl PointerLayout {
-    pub fn calculate(window_height: u32, task_list: &TaskListPane, error_list: &ErrorListPane) -> Self {
+    pub fn calculate(
+        window_height: u32,
+        task_list: &TaskListPane,
+        error_list: &ErrorListPane,
+    ) -> Self {
         let status_height = 28u32;
         let list_pane_visible = task_list.visible || error_list.visible;
         let list_pane_height = if list_pane_visible {

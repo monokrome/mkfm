@@ -4,11 +4,11 @@ use std::path::Path;
 
 use crate::filesystem::{self, Entry};
 
+use super::Browser;
 use super::expansion_helpers::{
     expand_all_marked, filter_hidden, find_children_range, get_expandable_entry, insert_children,
     load_children, remove_children,
 };
-use super::Browser;
 
 impl Browser {
     pub fn is_expanded(&self, path: &Path) -> bool {
@@ -24,9 +24,20 @@ impl Browser {
         }
 
         self.expanded_dirs.insert(entry.path.clone());
-        let children =
-            load_children(&entry.path, entry.depth + 1, self.show_hidden, self.sort_mode, self.sort_reverse);
-        insert_children(&mut self.entries, index + 1, children, recursive, &mut self.expanded_dirs);
+        let children = load_children(
+            &entry.path,
+            entry.depth + 1,
+            self.show_hidden,
+            self.sort_mode,
+            self.sort_reverse,
+        );
+        insert_children(
+            &mut self.entries,
+            index + 1,
+            children,
+            recursive,
+            &mut self.expanded_dirs,
+        );
 
         if recursive {
             self.rebuild_with_expansions();
@@ -42,7 +53,12 @@ impl Browser {
         }
 
         let range = find_children_range(&self.entries, index);
-        remove_children(&mut self.entries, range.clone(), recursive, &mut self.expanded_dirs);
+        remove_children(
+            &mut self.entries,
+            range.clone(),
+            recursive,
+            &mut self.expanded_dirs,
+        );
         self.expanded_dirs.remove(&entry.path);
         self.cursor = self.cursor.min(self.entries.len().saturating_sub(1));
     }

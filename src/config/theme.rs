@@ -2,7 +2,7 @@
 
 use prefer::Config as PreferConfig;
 
-use super::colors::{parse_rgb, parse_rgba, Rgb, Rgba};
+use super::colors::{Rgb, Rgba, parse_rgb, parse_rgba};
 
 /// Theme configuration
 #[derive(Clone, Debug)]

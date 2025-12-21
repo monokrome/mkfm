@@ -33,7 +33,10 @@ impl App {
     pub fn execute_yank(&mut self) -> bool {
         let yank_action = self.determine_yank_action();
         match yank_action {
-            YankAction::Archive { archive_path, file_paths } => {
+            YankAction::Archive {
+                archive_path,
+                file_paths,
+            } => {
                 self.clipboard.yank_from_archive(archive_path, file_paths);
             }
             YankAction::Filesystem { paths } => {
@@ -54,9 +57,14 @@ impl App {
                 return YankAction::None;
             };
             let file_paths = self.get_archive_file_paths(browser);
-            YankAction::Archive { archive_path, file_paths }
+            YankAction::Archive {
+                archive_path,
+                file_paths,
+            }
         } else {
-            YankAction::Filesystem { paths: self.selected_paths() }
+            YankAction::Filesystem {
+                paths: self.selected_paths(),
+            }
         }
     }
 
@@ -115,7 +123,11 @@ impl App {
             .iter()
             .filter_map(|src| {
                 let name = src.file_name()?;
-                Some(make_paste_job_kind(src, dest_dir.join(name), self.clipboard.is_cut))
+                Some(make_paste_job_kind(
+                    src,
+                    dest_dir.join(name),
+                    self.clipboard.is_cut,
+                ))
             })
             .collect();
 
@@ -131,15 +143,20 @@ impl App {
 
     pub fn execute_delete(&mut self) -> bool {
         if let Some(browser) = self.browser()
-            && let Some(entry) = browser.current_entry() {
-                let _ = filesystem::delete(&entry.path);
-            }
+            && let Some(entry) = browser.current_entry()
+        {
+            let _ = filesystem::delete(&entry.path);
+        }
         self.refresh_browser();
         true
     }
 
     pub fn execute_trash(&mut self) -> bool {
-        let jobs: Vec<_> = self.selected_paths().into_iter().map(|path| jobs::JobKind::Trash { path }).collect();
+        let jobs: Vec<_> = self
+            .selected_paths()
+            .into_iter()
+            .map(|path| jobs::JobKind::Trash { path })
+            .collect();
         for kind in jobs {
             self.submit_job(kind);
         }
@@ -161,13 +178,14 @@ impl App {
 
     pub fn execute_extract_archive(&mut self) -> bool {
         if let Some(browser) = self.browser()
-            && let Some(entry) = browser.current_entry() {
-                let kind = jobs::JobKind::Extract {
-                    archive: entry.path.clone(),
-                    dest: browser.path.clone(),
-                };
-                self.submit_job(kind);
-            }
+            && let Some(entry) = browser.current_entry()
+        {
+            let kind = jobs::JobKind::Extract {
+                archive: entry.path.clone(),
+                dest: browser.path.clone(),
+            };
+            self.submit_job(kind);
+        }
         self.refresh_browser();
         true
     }
@@ -186,8 +204,13 @@ impl App {
 }
 
 enum YankAction {
-    Archive { archive_path: PathBuf, file_paths: Vec<String> },
-    Filesystem { paths: Vec<PathBuf> },
+    Archive {
+        archive_path: PathBuf,
+        file_paths: Vec<String>,
+    },
+    Filesystem {
+        paths: Vec<PathBuf>,
+    },
     None,
 }
 
@@ -199,8 +222,14 @@ enum PasteAction {
 
 fn make_paste_job_kind(src: &Path, dest: PathBuf, is_cut: bool) -> jobs::JobKind {
     if is_cut {
-        jobs::JobKind::Move { src: src.to_path_buf(), dest }
+        jobs::JobKind::Move {
+            src: src.to_path_buf(),
+            dest,
+        }
     } else {
-        jobs::JobKind::Copy { src: src.to_path_buf(), dest }
+        jobs::JobKind::Copy {
+            src: src.to_path_buf(),
+            dest,
+        }
     }
 }

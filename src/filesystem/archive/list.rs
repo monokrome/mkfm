@@ -30,11 +30,7 @@ fn list_zip(path: &Path) -> Vec<ArchiveEntry> {
         return Vec::new();
     };
 
-    stdout
-        .lines()
-        .skip(3)
-        .filter_map(parse_zip_line)
-        .collect()
+    stdout.lines().skip(3).filter_map(parse_zip_line).collect()
 }
 
 fn parse_zip_line(line: &str) -> Option<ArchiveEntry> {

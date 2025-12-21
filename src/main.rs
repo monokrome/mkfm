@@ -63,10 +63,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         handle_theme_change(&mut app, &rt, &mut needs_redraw);
 
         let (win_w, win_h) = mkapp.window_size(window_id).unwrap_or((800, 600));
-        preview.update(&app, &mut mkapp, &qh, window_id, &overlay_config, win_w, win_h);
+        preview.update(
+            &app,
+            &mut mkapp,
+            &qh,
+            window_id,
+            &overlay_config,
+            win_w,
+            win_h,
+        );
 
-        render_if_needed(&mut mkapp, window_id, &mut text_renderer, &app, &mut needs_redraw);
-        render_preview_if_needed(&mut mkapp, &mut text_renderer, &mut preview, &overlay_config, win_w, win_h);
+        render_if_needed(
+            &mut mkapp,
+            window_id,
+            &mut text_renderer,
+            &app,
+            &mut needs_redraw,
+        );
+        render_preview_if_needed(
+            &mut mkapp,
+            &mut text_renderer,
+            &mut preview,
+            &overlay_config,
+            win_w,
+            win_h,
+        );
     }
 
     Ok(())
@@ -182,7 +203,9 @@ fn render_preview_if_needed(
 
     if let Some(attached_id) = preview.attached {
         if mkapp.is_attached_surface_dirty(attached_id) || preview.needs_render {
-            let content = preview.cache.get_or_load(path, preview_width - 20, preview_height - 20);
+            let content = preview
+                .cache
+                .get_or_load(path, preview_width - 20, preview_height - 20);
             mkapp.render_attached_surface(attached_id, |canvas| {
                 render_preview(canvas, text_renderer, content);
             });
@@ -192,7 +215,9 @@ fn render_preview_if_needed(
     } else if let Some(subsurface_id) = preview.subsurface
         && (mkapp.is_subsurface_dirty(subsurface_id) || preview.needs_render)
     {
-        let content = preview.cache.get_or_load(path, preview_width - 20, preview_height - 20);
+        let content = preview
+            .cache
+            .get_or_load(path, preview_width - 20, preview_height - 20);
         mkapp.render_subsurface(subsurface_id, |canvas| {
             render_preview(canvas, text_renderer, content);
         });

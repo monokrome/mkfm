@@ -41,9 +41,10 @@ impl App {
 
     fn apply_hidden_option(&mut self, negated: bool) -> CommandResult {
         if let Some(browser) = self.browser_mut()
-            && negated == browser.show_hidden {
-                browser.toggle_hidden();
-            }
+            && negated == browser.show_hidden
+        {
+            browser.toggle_hidden();
+        }
         CommandResult::Redraw
     }
 
@@ -128,7 +129,6 @@ impl App {
         }
         CommandResult::Redraw
     }
-
 }
 
 fn parse_set_option(arg: &str) -> (bool, &str) {

@@ -93,11 +93,29 @@ fn render_job_row(
 
     let text_w = (w as i32 - layout.padding * 3 - 100) as u32;
     let rect = Rect::new(x + layout.padding, y, text_w, layout.line_height as u32);
-    draw_text(canvas, tr, &text, rect, layout.font_size, colors.fg, HAlign::Left);
+    draw_text(
+        canvas,
+        tr,
+        &text,
+        rect,
+        layout.font_size,
+        colors.fg,
+        HAlign::Left,
+    );
 
     let prog_x = x + w as i32 - layout.padding - 100;
     let prog_rect = Rect::new(prog_x, y, 100, layout.line_height as u32);
-    render_job_status(canvas, tr, &job.status, job.progress, prog_x, y, colors, layout, prog_rect);
+    render_job_status(
+        canvas,
+        tr,
+        &job.status,
+        job.progress,
+        prog_x,
+        y,
+        colors,
+        layout,
+        prog_rect,
+    );
 }
 
 fn job_status_icon(status: &JobStatus) -> &'static str {
@@ -123,7 +141,9 @@ fn render_job_status(
 ) {
     let small_font = layout.font_size - 2.0;
     match status {
-        JobStatus::Running => render_running_status(canvas, tr, progress, x, y, colors, rect, small_font),
+        JobStatus::Running => {
+            render_running_status(canvas, tr, progress, x, y, colors, rect, small_font)
+        }
         JobStatus::Complete => render_complete_status(canvas, tr, rect, small_font),
         JobStatus::Failed(msg) => render_failed_status(canvas, tr, msg, rect, small_font),
         JobStatus::Pending => render_pending_status(canvas, tr, colors, rect, small_font),
@@ -153,7 +173,15 @@ fn render_running_status(
             Color::from_rgba8(100, 200, 100, 255),
         );
     } else {
-        draw_text(canvas, tr, "Running...", rect, font_size, colors.fg, HAlign::Right);
+        draw_text(
+            canvas,
+            tr,
+            "Running...",
+            rect,
+            font_size,
+            colors.fg,
+            HAlign::Right,
+        );
     }
 }
 
@@ -195,5 +223,13 @@ fn render_pending_status(
     rect: Rect,
     font_size: f32,
 ) {
-    draw_text(canvas, tr, "Pending", rect, font_size, colors.fg, HAlign::Right);
+    draw_text(
+        canvas,
+        tr,
+        "Pending",
+        rect,
+        font_size,
+        colors.fg,
+        HAlign::Right,
+    );
 }

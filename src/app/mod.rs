@@ -205,23 +205,25 @@ impl App {
 
     /// Check if drag should start, return files to drag
     pub fn take_drag_files(&mut self) -> Option<Vec<PathBuf>> {
-        if self.dragging && self.drag_start_pos.is_some()
-            && let Some(browser) = self.browser() {
-                let files: Vec<PathBuf> = if self.selection.is_empty() {
-                    browser
-                        .entries
-                        .get(browser.cursor)
-                        .map(|e| vec![e.path.clone()])
-                        .unwrap_or_default()
-                } else {
-                    self.selection.to_paths(&browser.entries)
-                };
+        if self.dragging
+            && self.drag_start_pos.is_some()
+            && let Some(browser) = self.browser()
+        {
+            let files: Vec<PathBuf> = if self.selection.is_empty() {
+                browser
+                    .entries
+                    .get(browser.cursor)
+                    .map(|e| vec![e.path.clone()])
+                    .unwrap_or_default()
+            } else {
+                self.selection.to_paths(&browser.entries)
+            };
 
-                if !files.is_empty() {
-                    self.drag_start_pos = None;
-                    return Some(files);
-                }
+            if !files.is_empty() {
+                self.drag_start_pos = None;
+                return Some(files);
             }
+        }
         None
     }
 

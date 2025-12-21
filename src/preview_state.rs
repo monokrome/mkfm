@@ -2,7 +2,9 @@
 
 use std::path::PathBuf;
 
-use mkframe::{App as MkApp, AttachedAnchor, AttachedSurfaceId, QueueHandle, SubsurfaceId, WindowId};
+use mkframe::{
+    App as MkApp, AttachedAnchor, AttachedSurfaceId, QueueHandle, SubsurfaceId, WindowId,
+};
 
 use crate::app::App;
 use crate::config::{OverlayConfig, OverlayPosition};
@@ -46,7 +48,15 @@ impl PreviewState {
         let should_show = app.overlay_enabled && current_preview_file.is_some();
 
         if should_show {
-            self.show_preview(mkapp, qh, window_id, overlay_config, &current_preview_file, win_w, win_h);
+            self.show_preview(
+                mkapp,
+                qh,
+                window_id,
+                overlay_config,
+                &current_preview_file,
+                win_w,
+                win_h,
+            );
         } else {
             self.hide_preview(mkapp);
         }
@@ -67,23 +77,26 @@ impl PreviewState {
         let file_changed = self.path != *current_file;
 
         if (!have_preview || file_changed)
-            && let Some(path) = current_file {
-                let preview_width = config.max_width.resolve(win_w) as u32;
-                let preview_height = config.max_height.resolve(win_h) as u32;
-                let content = self.cache.get_or_load(path, preview_width, preview_height);
-                let (actual_w, actual_h) = content.dimensions(preview_width, preview_height);
+            && let Some(path) = current_file
+        {
+            let preview_width = config.max_width.resolve(win_w) as u32;
+            let preview_height = config.max_height.resolve(win_h) as u32;
+            let content = self.cache.get_or_load(path, preview_width, preview_height);
+            let (actual_w, actual_h) = content.dimensions(preview_width, preview_height);
 
-                if file_changed {
-                    self.close_surfaces(mkapp);
-                }
-
-                self.path = current_file.clone();
-
-                if self.attached.is_none() && self.subsurface.is_none() {
-                    self.create_surface(mkapp, qh, window_id, config, actual_w, actual_h, win_w, win_h);
-                }
-                self.needs_render = true;
+            if file_changed {
+                self.close_surfaces(mkapp);
             }
+
+            self.path = current_file.clone();
+
+            if self.attached.is_none() && self.subsurface.is_none() {
+                self.create_surface(
+                    mkapp, qh, window_id, config, actual_w, actual_h, win_w, win_h,
+                );
+            }
+            self.needs_render = true;
+        }
     }
 
     fn hide_preview(&mut self, mkapp: &mut MkApp) {
@@ -118,7 +131,11 @@ impl PreviewState {
     ) {
         let anchor = position_to_anchor(config.position);
         let margin = config.margin.resolve(win_w.min(win_h));
-        let offset = config.offset.resolve(if is_horizontal(config.position) { win_h } else { win_w });
+        let offset = config.offset.resolve(if is_horizontal(config.position) {
+            win_h
+        } else {
+            win_w
+        });
 
         if self.use_attached {
             self.attached = mkapp.create_attached_surface(qh, window_id, 0, 0, width, height);
@@ -126,7 +143,15 @@ impl PreviewState {
                 mkapp.set_attached_surface_anchor(id, anchor, margin, offset);
             }
         } else {
-            let (x, y) = calculate_subsurface_position(config.position, width, height, win_w, win_h, margin, offset);
+            let (x, y) = calculate_subsurface_position(
+                config.position,
+                width,
+                height,
+                win_w,
+                win_h,
+                margin,
+                offset,
+            );
             self.subsurface = mkapp.create_subsurface(qh, window_id, x, y, width, height);
         }
     }

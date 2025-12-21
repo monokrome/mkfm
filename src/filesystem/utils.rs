@@ -26,9 +26,10 @@ pub fn trash(path: &Path) -> std::io::Result<()> {
     let result = Command::new("trash-put").arg(path).status();
 
     if let Ok(status) = result
-        && status.success() {
-            return Ok(());
-        }
+        && status.success()
+    {
+        return Ok(());
+    }
 
     // Fall back to gio trash
     let result = Command::new("gio")
@@ -36,9 +37,10 @@ pub fn trash(path: &Path) -> std::io::Result<()> {
         .status();
 
     if let Ok(status) = result
-        && status.success() {
-            return Ok(());
-        }
+        && status.success()
+    {
+        return Ok(());
+    }
 
     // Fall back to moving to XDG trash
     let trash_dir = std::env::var("XDG_DATA_HOME")

@@ -40,9 +40,10 @@ pub fn remove_children(
     if recursive {
         for i in range.clone() {
             if let Some(child) = entries.get(i)
-                && child.is_dir {
-                    expanded_dirs.remove(&child.path);
-                }
+                && child.is_dir
+            {
+                expanded_dirs.remove(&child.path);
+            }
         }
     }
     if !range.is_empty() {
@@ -96,8 +97,13 @@ pub fn expand_all_marked(
     let mut i = 0;
     while i < entries.len() {
         if should_expand_entry(&entries[i], expanded_dirs) {
-            let children =
-                load_children(&entries[i].path, entries[i].depth + 1, show_hidden, sort_mode, sort_reverse);
+            let children = load_children(
+                &entries[i].path,
+                entries[i].depth + 1,
+                show_hidden,
+                sort_mode,
+                sort_reverse,
+            );
             for (j, child) in children.into_iter().enumerate() {
                 entries.insert(i + 1 + j, child);
             }
