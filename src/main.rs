@@ -35,6 +35,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let overlay_config = rt.block_on(app.config.overlay());
     let mut text_renderer = TextRenderer::new();
 
+    // Check if icon glyphs are available, disable icons if not
+    if app.icons_enabled {
+        let icon_char = app.theme.icon_folder.chars().next().unwrap_or('\u{f07b}');
+        if !text_renderer.has_glyph(icon_char) {
+            app.icons_enabled = false;
+        }
+    }
+
     let (mut mkapp, mut event_queue) = MkApp::new()?;
     let qh = event_queue.handle();
 

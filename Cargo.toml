@@ -7,7 +7,7 @@ license = "GPL-3.0"
 
 [dependencies]
 # UI toolkit
-mkframe = "0.1.1"
+mkframe = { path = "../mkframe" }
 
 # Image loading and EXIF
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
