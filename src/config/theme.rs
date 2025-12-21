@@ -35,9 +35,9 @@ impl Default for Theme {
             status_bg: Rgba::new(50, 50, 60, 255),
             border: Rgba::new(80, 80, 100, 255),
             border_focused: Rgba::new(100, 150, 255, 255),
-            icon_folder: "\u{f07b}".to_string(),
-            icon_folder_open: "\u{f07c}".to_string(),
-            icon_file: "\u{f15b}".to_string(),
+            icon_folder: "[+]".to_string(),
+            icon_folder_open: "[-]".to_string(),
+            icon_file: "[ ]".to_string(),
         }
     }
 }
@@ -133,7 +133,7 @@ mod tests {
         assert_eq!(theme.background.r, 30);
         assert_eq!(theme.foreground.r, 220);
         assert_eq!(theme.directory.r, 138);
-        assert_eq!(theme.icon_folder, "\u{f07b}");
-        assert_eq!(theme.icon_file, "\u{f15b}");
+        assert_eq!(theme.icon_folder, "[+]");
+        assert_eq!(theme.icon_file, "[ ]");
     }
 }

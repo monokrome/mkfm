@@ -205,7 +205,7 @@ fn render_preview_if_needed(
         if mkapp.is_attached_surface_dirty(attached_id) || preview.needs_render {
             let content = preview
                 .cache
-                .get_or_load(path, preview_width - 20, preview_height - 20);
+                .get_or_load(path, preview_width, preview_height);
             mkapp.render_attached_surface(attached_id, |canvas| {
                 render_preview(canvas, text_renderer, content);
             });
@@ -217,7 +217,7 @@ fn render_preview_if_needed(
     {
         let content = preview
             .cache
-            .get_or_load(path, preview_width - 20, preview_height - 20);
+            .get_or_load(path, preview_width, preview_height);
         mkapp.render_subsurface(subsurface_id, |canvas| {
             render_preview(canvas, text_renderer, content);
         });
