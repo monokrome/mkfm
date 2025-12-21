@@ -116,6 +116,8 @@ impl PreviewContent {
 pub struct PreviewCache {
     path: Option<PathBuf>,
     content: Option<PreviewContent>,
+    cached_width: u32,
+    cached_height: u32,
 }
 
 impl PreviewCache {
@@ -123,6 +125,8 @@ impl PreviewCache {
         Self {
             path: None,
             content: None,
+            cached_width: 0,
+            cached_height: 0,
         }
     }
 
@@ -132,8 +136,13 @@ impl PreviewCache {
         max_width: u32,
         max_height: u32,
     ) -> &PreviewContent {
-        if self.path.as_deref() != Some(path) {
+        let path_changed = self.path.as_deref() != Some(path);
+        let dims_changed = self.cached_width != max_width || self.cached_height != max_height;
+
+        if path_changed || dims_changed {
             self.path = Some(path.to_path_buf());
+            self.cached_width = max_width;
+            self.cached_height = max_height;
             self.content = Some(self.load_content(path, max_width, max_height));
         }
         self.content.as_ref().unwrap()

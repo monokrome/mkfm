@@ -18,6 +18,8 @@ pub struct PreviewState {
     pub attached: Option<AttachedSurfaceId>,
     pub subsurface: Option<SubsurfaceId>,
     use_attached: bool,
+    last_win_w: u32,
+    last_win_h: u32,
 }
 
 impl PreviewState {
@@ -29,6 +31,8 @@ impl PreviewState {
             attached: None,
             subsurface: None,
             use_attached,
+            last_win_w: 0,
+            last_win_h: 0,
         }
     }
 
@@ -75,27 +79,33 @@ impl PreviewState {
     ) {
         let have_preview = self.attached.is_some() || self.subsurface.is_some();
         let file_changed = self.path != *current_file;
+        let dims_changed = self.last_win_w != win_w || self.last_win_h != win_h;
 
-        if (!have_preview || file_changed)
-            && let Some(path) = current_file
-        {
-            let preview_width = config.max_width.resolve(win_w) as u32;
-            let preview_height = config.max_height.resolve(win_h) as u32;
-            let content = self.cache.get_or_load(path, preview_width, preview_height);
-            let (actual_w, actual_h) = content.dimensions(preview_width, preview_height);
+        if let Some(path) = current_file {
+            let needs_recreate = !have_preview || file_changed || dims_changed;
 
-            if file_changed {
-                self.close_surfaces(mkapp);
+            if needs_recreate {
+                let preview_width = config.max_width.resolve(win_w) as u32;
+                let preview_height = config.max_height.resolve(win_h) as u32;
+                let content = self.cache.get_or_load(path, preview_width, preview_height);
+                let (actual_w, actual_h) = content.dimensions(preview_width, preview_height);
+
+                // Close existing surfaces if file or dimensions changed
+                if file_changed || dims_changed {
+                    self.close_surfaces(mkapp);
+                }
+
+                self.path = current_file.clone();
+                self.last_win_w = win_w;
+                self.last_win_h = win_h;
+
+                if self.attached.is_none() && self.subsurface.is_none() {
+                    self.create_surface(
+                        mkapp, qh, window_id, config, actual_w, actual_h, win_w, win_h,
+                    );
+                }
+                self.needs_render = true;
             }
-
-            self.path = current_file.clone();
-
-            if self.attached.is_none() && self.subsurface.is_none() {
-                self.create_surface(
-                    mkapp, qh, window_id, config, actual_w, actual_h, win_w, win_h,
-                );
-            }
-            self.needs_render = true;
         }
     }
 
