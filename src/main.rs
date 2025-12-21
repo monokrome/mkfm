@@ -6,6 +6,7 @@ mod cli;
 mod config;
 mod event_loop;
 mod features;
+mod ffmpeg;
 mod filesystem;
 mod input;
 mod jobs;

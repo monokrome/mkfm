@@ -13,6 +13,15 @@ pub use overlay::{Dimension, OverlayConfig, OverlayPosition};
 pub use saved::SavedSettings;
 pub use theme::Theme;
 
+/// Icon display mode
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum IconsMode {
+    #[default]
+    Auto,
+    Enabled,
+    Disabled,
+}
+
 use prefer::Config as PreferConfig;
 
 pub struct Config {
@@ -71,6 +80,19 @@ impl Config {
 
     pub async fn vi_mode(&self) -> bool {
         self.get_bool("vi").await.unwrap_or(false)
+    }
+
+    pub async fn search_narrowing(&self) -> bool {
+        self.get_bool("search_narrowing").await.unwrap_or(false)
+    }
+
+    pub async fn icons(&self) -> IconsMode {
+        match self.get_str("icons").await.as_deref() {
+            Some("true") | Some("enabled") | Some("on") => IconsMode::Enabled,
+            Some("false") | Some("disabled") | Some("off") => IconsMode::Disabled,
+            Some("auto") | None => IconsMode::Auto,
+            _ => IconsMode::Auto,
+        }
     }
 
     pub async fn overlay(&self) -> OverlayConfig {

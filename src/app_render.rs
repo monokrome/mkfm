@@ -88,6 +88,7 @@ fn render_split_panes(
             focused,
             colors,
             layout,
+            app.icons_enabled,
         );
     });
 }

@@ -16,6 +16,7 @@ pub struct FileListContext<'a> {
     pub search_highlight: bool,
     pub search_matches: &'a [usize],
     pub theme: &'a Theme,
+    pub icons_enabled: bool,
 }
 
 /// Get the header text for a browser pane
@@ -49,6 +50,7 @@ pub fn render_browser_pane(
     is_focused: bool,
     colors: &RenderColors,
     layout: &RenderLayout,
+    icons_enabled: bool,
 ) {
     let border = if is_focused {
         colors.border_focused
@@ -76,6 +78,7 @@ pub fn render_browser_pane(
         search_highlight,
         search_matches,
         theme,
+        icons_enabled,
     };
     render_file_list(canvas, tr, &ctx, inner_x, list_y, inner_w, list_h, colors, layout);
 }
@@ -120,7 +123,19 @@ fn render_file_list(
             is_match,
             colors,
         );
-        render_file_entry(canvas, tr, entry, ctx.browser, ctx.theme, x, row_y, w, colors, layout);
+        render_file_entry(
+            canvas,
+            tr,
+            entry,
+            ctx.browser,
+            ctx.theme,
+            x,
+            row_y,
+            w,
+            colors,
+            layout,
+            ctx.icons_enabled,
+        );
     }
 }
 
@@ -144,10 +159,15 @@ fn render_file_entry(
     w: u32,
     colors: &RenderColors,
     layout: &RenderLayout,
+    icons_enabled: bool,
 ) {
     let indent = entry.depth as i32 * 16;
-    let icon = select_icon(entry, browser, theme);
-    let display = format!("{} {}", icon, entry.name);
+    let display = if icons_enabled {
+        let icon = select_icon(entry, browser, theme);
+        format!("{} {}", icon, entry.name)
+    } else {
+        entry.name.clone()
+    };
     let color = if entry.is_dir {
         colors.directory
     } else {

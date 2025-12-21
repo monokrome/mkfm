@@ -61,6 +61,9 @@ pub struct App {
     pub search_highlight: bool,
     pub search_matches: Vec<usize>,
     pub current_match: Option<usize>,
+    pub pre_search_cursor: Option<usize>,
+    pub search_active: bool,
+    pub search_narrowing: bool,
     // Bookmarks
     pub bookmarks: HashMap<char, PathBuf>,
     // Sorting
@@ -77,6 +80,8 @@ pub struct App {
     pub focus_area: FocusArea,
     // Input mode
     pub vi_mode: bool,
+    // Icon display
+    pub icons_enabled: bool,
     // Click tracking
     pub last_click_time: std::time::Instant,
     pub last_click_pos: (f64, f64),
@@ -100,6 +105,15 @@ impl App {
         let show_parent_entry = config.show_parent_entry().await;
         let overlay_enabled = config.overlay().await.enabled;
         let vi_mode = config.vi_mode().await;
+        let search_narrowing = config.search_narrowing().await;
+        let icons_mode = config.icons().await;
+        let icons_enabled = match icons_mode {
+            crate::config::IconsMode::Enabled => true,
+            crate::config::IconsMode::Disabled => false,
+            // For auto mode, default to true (assume Nerd Fonts available)
+            // User can set icons = "false" if they don't have them
+            crate::config::IconsMode::Auto => true,
+        };
         let theme_name = config.theme().await;
         let theme = Theme::load(theme_name.as_deref()).await;
         let openers = Openers::load();
@@ -142,6 +156,9 @@ impl App {
             search_highlight: false,
             search_matches: Vec::new(),
             current_match: None,
+            pre_search_cursor: None,
+            search_active: false,
+            search_narrowing,
             bookmarks: HashMap::new(),
             sort_mode: SortMode::default(),
             sort_reverse: false,
@@ -152,6 +169,7 @@ impl App {
             runtime: tokio::runtime::Handle::current(),
             focus_area: FocusArea::Splits,
             vi_mode,
+            icons_enabled,
             last_click_time: std::time::Instant::now(),
             last_click_pos: (0.0, 0.0),
             drag_start_pos: None,
@@ -253,7 +271,11 @@ impl App {
             .and_then(|b| b.current_entry())
             .filter(|e| !e.is_dir)
             .map(|e| e.path.clone())
-            .filter(|p| crate::preview::is_image_file(p) || crate::preview::is_text_file(p))
+            .filter(|p| {
+                crate::preview::is_image_file(p)
+                    || crate::preview::is_text_file(p)
+                    || crate::preview::is_media_file(p)
+            })
     }
 
     /// Get selected file paths

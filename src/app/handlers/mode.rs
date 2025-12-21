@@ -24,6 +24,9 @@ impl App {
         } else if self.mode == Mode::Visual {
             self.mode = Mode::Normal;
             self.selection.clear();
+        } else if self.search_active {
+            // Cancel active search (ESC after search was executed)
+            self.execute_clear_search_highlight();
         }
         true
     }
