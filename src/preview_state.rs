@@ -23,14 +23,15 @@ pub struct PreviewState {
 }
 
 impl PreviewState {
-    pub fn new(use_attached: bool) -> Self {
+    pub fn new(_use_attached: bool) -> Self {
+        // Always use subsurfaces - attached surfaces may be size-limited by the compositor
         Self {
             path: None,
             needs_render: false,
             cache: PreviewCache::new(),
             attached: None,
             subsurface: None,
-            use_attached,
+            use_attached: false,
             last_win_w: 0,
             last_win_h: 0,
         }

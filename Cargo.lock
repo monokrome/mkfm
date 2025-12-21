@@ -1253,7 +1253,9 @@ dependencies = [
 
 [[package]]
 name = "mkframe"
-version = "0.1.1"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "febfde5a4db2437cea75b24a316559f82b25634ab787d731dc19b97e1d3186c5"
 dependencies = [
  "bytemuck",
  "cosmic-text",
