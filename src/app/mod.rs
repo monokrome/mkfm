@@ -14,6 +14,7 @@ mod pointer_helpers;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::cli::StartPath;
 use crate::config::{Config, Openers, SavedSettings, Theme};
 use crate::features;
 use crate::input::{Action, Mode, SortMode, handle_key};
@@ -95,7 +96,7 @@ pub struct App {
 
 impl App {
     /// Create a new App instance
-    pub async fn new(start_paths: Vec<PathBuf>, split_direction: SplitDirection) -> Self {
+    pub async fn new(start_paths: Vec<StartPath>, split_direction: SplitDirection) -> Self {
         let config = Config::load().await.unwrap_or_else(|e| {
             eprintln!("failed to load config: {e}");
             std::process::exit(1);
@@ -125,10 +126,20 @@ impl App {
         } else {
             let mut iter = start_paths.into_iter();
             if let Some(first) = iter.next() {
-                splits.set_root(Browser::new(show_hidden, show_parent_entry, Some(first)));
+                splits.set_root(Browser::with_selection(
+                    show_hidden,
+                    show_parent_entry,
+                    Some(first.directory),
+                    &first.select_files,
+                ));
             }
-            for path in iter {
-                let browser = Browser::new(show_hidden, show_parent_entry, Some(path));
+            for start_path in iter {
+                let browser = Browser::with_selection(
+                    show_hidden,
+                    show_parent_entry,
+                    Some(start_path.directory),
+                    &start_path.select_files,
+                );
                 match split_direction {
                     SplitDirection::Vertical => splits.split_vertical(browser),
                     SplitDirection::Horizontal => splits.split_horizontal(browser),

@@ -1,11 +1,19 @@
 //! Command-line argument parsing
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use mkframe::SplitDirection;
 
-pub fn parse_args() -> (Vec<PathBuf>, SplitDirection) {
-    let mut paths = Vec::new();
+/// A start path with optional files to select
+#[derive(Debug, Clone)]
+pub struct StartPath {
+    pub directory: PathBuf,
+    pub select_files: Vec<String>,
+}
+
+pub fn parse_args() -> (Vec<StartPath>, SplitDirection) {
+    let mut raw_paths = Vec::new();
     let mut direction = SplitDirection::Vertical;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -16,12 +24,60 @@ pub fn parse_args() -> (Vec<PathBuf>, SplitDirection) {
             "-v" | "--vertical" => direction = SplitDirection::Vertical,
             "-s" | "--horizontal" => direction = SplitDirection::Horizontal,
             "-h" | "--help" => print_help(),
-            path => paths.push(PathBuf::from(path)),
+            path => raw_paths.push(PathBuf::from(path)),
         }
         i += 1;
     }
 
-    (paths, direction)
+    let start_paths = process_paths(raw_paths);
+    (start_paths, direction)
+}
+
+/// Process raw paths into StartPaths, grouping files by parent directory
+fn process_paths(raw_paths: Vec<PathBuf>) -> Vec<StartPath> {
+    if raw_paths.is_empty() {
+        return Vec::new();
+    }
+
+    // Group paths by their effective directory
+    let mut dir_files: HashMap<PathBuf, Vec<String>> = HashMap::new();
+    let mut dir_order: Vec<PathBuf> = Vec::new();
+
+    for path in raw_paths {
+        let canonical = path.canonicalize().unwrap_or(path);
+
+        if canonical.is_dir() {
+            dir_files.entry(canonical.clone()).or_insert_with(|| {
+                dir_order.push(canonical);
+                Vec::new()
+            });
+        } else if canonical.is_file()
+            && let Some(parent) = canonical.parent()
+        {
+            let parent = parent.to_path_buf();
+            let filename = canonical
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+
+            let files = dir_files.entry(parent.clone()).or_insert_with(|| {
+                dir_order.push(parent);
+                Vec::new()
+            });
+            if !files.contains(&filename) {
+                files.push(filename);
+            }
+        }
+    }
+
+    dir_order
+        .into_iter()
+        .map(|dir| StartPath {
+            select_files: dir_files.remove(&dir).unwrap_or_default(),
+            directory: dir,
+        })
+        .collect()
 }
 
 fn print_help() -> ! {

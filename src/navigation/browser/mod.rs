@@ -35,6 +35,15 @@ pub struct Browser {
 
 impl Browser {
     pub fn new(show_hidden: bool, show_parent_entry: bool, start_path: Option<PathBuf>) -> Self {
+        Self::with_selection(show_hidden, show_parent_entry, start_path, &[])
+    }
+
+    pub fn with_selection(
+        show_hidden: bool,
+        show_parent_entry: bool,
+        start_path: Option<PathBuf>,
+        select_files: &[String],
+    ) -> Self {
         let path = match start_path {
             Some(p) if p.is_dir() => p,
             Some(p) => {
@@ -60,7 +69,23 @@ impl Browser {
             expanded_dirs: HashSet::new(),
         };
         browser.refresh();
+
+        // Select first matching file if any were specified
+        if let Some(first_file) = select_files.first() {
+            browser.select_by_name(first_file);
+        }
+
         browser
+    }
+
+    /// Move cursor to entry matching the given name
+    pub fn select_by_name(&mut self, name: &str) {
+        for (i, entry) in self.entries.iter().enumerate() {
+            if entry.name == name {
+                self.cursor = i;
+                return;
+            }
+        }
     }
 
     fn home_dir() -> PathBuf {
