@@ -69,6 +69,7 @@ pub fn render_app(
             browser.path.hash(&mut hasher);
             browser.cursor.hash(&mut hasher);
             browser.entries.len().hash(&mut hasher);
+            app.preview_zoom.to_bits().hash(&mut hasher);
             let browser_gen = hasher.finish();
 
             let show_preview = focused
