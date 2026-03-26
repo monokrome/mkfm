@@ -95,8 +95,8 @@ pub struct App {
     pub playback: Option<crate::app::handlers::media::VideoPlayback>,
     pub media_path: Option<PathBuf>,
     pub media_position: f64,
-    // Preview sizing — None means auto (based on filename width)
-    pub preview_zoom: Option<f32>,
+    // Preview content zoom (1.0 = fit to preview area, 2.0 = 200%)
+    pub preview_zoom: f32,
 }
 
 impl App {
@@ -194,7 +194,7 @@ impl App {
             playback: None,
             media_path: None,
             media_position: 0.0,
-            preview_zoom: None,
+            preview_zoom: 1.0,
         }
     }
 
@@ -288,6 +288,7 @@ impl App {
             // Count sets absolute zoom percentage
             Action::MediaZoomIn => self.execute_media_zoom(true, Some(count)),
             Action::MediaZoomOut => self.execute_media_zoom(false, Some(count)),
+
             _ => self.execute(action),
         }
     }

@@ -135,18 +135,15 @@ impl App {
         true
     }
 
-    /// Zoom preview. `amount` is a percentage (e.g. 70 = set to 70% of pane).
-    /// Without a count, nudges by 5%.
+    /// Zoom preview content within the preview area.
+    /// `amount` is a percentage (e.g. 200 = 200% zoom). Without count, nudges by 10%.
     pub fn execute_media_zoom(&mut self, zoom_in: bool, amount: Option<usize>) -> bool {
         if let Some(pct) = amount {
-            // Absolute: 70gmk = preview takes 70% of pane
-            self.preview_zoom = Some((pct as f32 / 100.0).clamp(0.1, 0.9));
+            self.preview_zoom = pct as f32 / 100.0;
         } else if zoom_in {
-            let current = self.preview_zoom.unwrap_or(0.5);
-            self.preview_zoom = Some((current + 0.05).min(0.9));
+            self.preview_zoom = (self.preview_zoom + 0.1).min(5.0);
         } else {
-            let current = self.preview_zoom.unwrap_or(0.5);
-            self.preview_zoom = Some((current - 0.05).max(0.1));
+            self.preview_zoom = (self.preview_zoom - 0.1).max(0.1);
         }
         true
     }

@@ -77,13 +77,7 @@ pub fn render_app(
                 && pane_rect.width >= PREVIEW_MIN_WIDTH;
 
             let (list_rect, preview_rect) = if show_preview {
-                let list_w = if let Some(zoom) = app.preview_zoom {
-                    // Zoom overrides: preview gets `zoom` fraction, list gets the rest
-                    let preview_w = (pane_rect.width as f32 * zoom) as u16;
-                    pane_rect.width.saturating_sub(preview_w).max(MIN_LIST_WIDTH)
-                } else {
-                    calculate_list_width(browser, pane_rect.width)
-                };
+                let list_w = calculate_list_width(browser, pane_rect.width);
                 let preview_w = pane_rect.width.saturating_sub(list_w);
                 (
                     Rect::new(pane_rect.x, pane_rect.y, list_w, pane_rect.height),
@@ -124,11 +118,13 @@ pub fn render_app(
 
                 if let Some(ref playback) = app.playback {
                     if !playback.current_frame.is_empty() {
-                        // Clear preview area before rendering video frame
                         let _ = renderer.fill_rect(prev_rect, colors.bg);
+                        // Apply zoom: scale content dimensions up, ObjectFit clips to bounds
+                        let zoomed_w = (playback.width as f32 * app.preview_zoom) as u32;
+                        let zoomed_h = (playback.height as f32 * app.preview_zoom) as u32;
                         let dst = mkui::layout::ObjectFit::Contain.fit_with_aspect(
-                            playback.width,
-                            playback.height,
+                            zoomed_w,
+                            zoomed_h,
                             prev_rect,
                             renderer.cell_aspect(),
                         );
@@ -143,7 +139,6 @@ pub fn render_app(
                         });
                     }
                 } else {
-                    // Static preview — same generation as browser pane
                     if tracker.needs_render(renderer, preview_id, browser_gen, prev_rect) {
                         render_inline_preview(
                             renderer,
@@ -151,6 +146,7 @@ pub fn render_app(
                             &mut preview.cache,
                             prev_rect,
                             &colors,
+                            app.preview_zoom,
                         );
                     }
                 }
@@ -216,6 +212,7 @@ fn render_inline_preview(
     cache: &mut PreviewCache,
     bounds: Rect,
     colors: &render::RenderColors,
+    zoom: f32,
 ) {
     if browser.cursor >= browser.entries.len() {
         return;
@@ -235,7 +232,7 @@ fn render_inline_preview(
     }
 
     let content = cache.get_or_load(&file_path, 1920, 1080);
-    render_preview(renderer, content, bounds, colors.fg, colors.bg);
+    render_preview(renderer, content, bounds, colors.fg, colors.bg, zoom);
 }
 
 fn calculate_list_width(browser: &crate::navigation::Browser, pane_width: u16) -> u16 {

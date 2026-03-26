@@ -14,8 +14,8 @@ pub fn render_preview(
     bounds: Rect,
     fg: Color,
     bg: Color,
+    zoom: f32,
 ) {
-    // Background
     let _ = renderer.fill_rect(bounds, bg);
 
     match content {
@@ -23,7 +23,11 @@ pub fn render_preview(
             data,
             width,
             height,
-        } => render_image_preview(renderer, data, *width, *height, bounds),
+        } => {
+            let zoomed_w = (*width as f32 * zoom) as u32;
+            let zoomed_h = (*height as f32 * zoom) as u32;
+            render_image_preview(renderer, data, *width, *height, zoomed_w, zoomed_h, bounds);
+        }
         PreviewContent::Text(lines) => render_text_preview(renderer, lines, bounds, fg),
         PreviewContent::Media {
             media_type,
@@ -51,17 +55,18 @@ pub fn render_preview(
 fn render_image_preview(
     renderer: &mut dyn Renderer,
     data: &[u8],
-    width: u32,
-    height: u32,
+    data_width: u32,
+    data_height: u32,
+    display_width: u32,
+    display_height: u32,
     bounds: Rect,
 ) {
-    let dst = ObjectFit::Contain.fit_with_aspect(width, height, bounds, renderer.cell_aspect());
+    let dst = ObjectFit::Contain.fit_with_aspect(display_width, display_height, bounds, renderer.cell_aspect());
 
-    // Preview images are loaded as RGBA
     let _ = renderer.render_image_rgba(&ImageParams {
         data,
-        width,
-        height,
+        width: data_width,
+        height: data_height,
         col: dst.x,
         row: dst.y,
         width_cells: Some(dst.width),
