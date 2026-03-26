@@ -128,7 +128,7 @@ pub fn render_app(
                             prev_rect,
                             renderer.cell_aspect(),
                         );
-                        let _ = renderer.render_image(&mkui::render::ImageParams {
+                        let _ = renderer.render_animation_frame(&mkui::render::ImageParams {
                             data: &playback.current_frame,
                             width: playback.width,
                             height: playback.height,
