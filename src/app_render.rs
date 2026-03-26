@@ -1,5 +1,6 @@
 //! Application rendering — composes mkui rendering for the file manager UI
 
+use mkui::component_state::RenderTracker;
 use mkui::layout::Rect;
 use mkui::render::Renderer;
 use mkui::style::Style;
@@ -21,12 +22,17 @@ const MIN_LIST_WIDTH: u16 = 20;
 /// Maximum fraction the file list can take
 const MAX_LIST_RATIO: f32 = 0.5;
 
-/// Render the entire application UI
+/// Component IDs for the render tracker
+const ID_STATUS: usize = 1000;
+const ID_TASK_PANE: usize = 1001;
+
+/// Render the entire application UI using incremental tracking
 pub fn render_app(
     renderer: &mut dyn Renderer,
     app: &App,
     theme: &Theme,
     preview: &mut PreviewState,
+    tracker: &mut RenderTracker,
 ) {
     let (width, height) = renderer.dimensions();
     let colors = render::RenderColors::from_theme(theme);
@@ -42,8 +48,7 @@ pub fn render_app(
     let pane_layout = app.splits.layout(bounds);
     for (_, pane_rect) in &pane_layout {
         if pane_rect.x > 0 {
-            let border_color = colors.border;
-            let border_style = Style::new().fg(border_color);
+            let border_style = Style::new().fg(colors.border);
             for row in 0..pane_rect.height {
                 let _ = renderer.move_cursor(pane_rect.x.saturating_sub(1), pane_rect.y + row);
                 let _ = renderer.write_styled("│", &border_style);
@@ -53,10 +58,14 @@ pub fn render_app(
 
     // Render split panes (file browsers)
     app.splits
-        .render(bounds, |_leaf_id, pane_rect, browser, is_focused| {
+        .render(bounds, |leaf_id, pane_rect, browser, is_focused| {
             let focused = is_focused && app.focus_area == FocusArea::Splits;
+            let pane_id = leaf_id.0;
 
-            // Determine if we should show inline preview
+            // Use cursor + entry count as a simple generation for the browser
+            let browser_gen = (browser.cursor as u64) << 32
+                | (browser.entries.len() as u64);
+
             let show_preview = focused
                 && app.overlay_enabled
                 && !preview.is_overlay_active()
@@ -78,27 +87,32 @@ pub fn render_app(
                 (pane_rect, None)
             };
 
-            render::render_browser_pane(
-                renderer,
-                browser,
-                &app.selection,
-                app.search_highlight,
-                &app.search_matches,
-                theme,
-                list_rect.x,
-                list_rect.y,
-                list_rect.width,
-                list_rect.height,
-                focused,
-                &colors,
-                &layout,
-                app.icons_enabled,
-            );
+            // Check if browser pane needs rendering
+            if tracker.needs_render(renderer, pane_id, browser_gen, list_rect) {
+                render::render_browser_pane(
+                    renderer,
+                    browser,
+                    &app.selection,
+                    app.search_highlight,
+                    &app.search_matches,
+                    theme,
+                    list_rect.x,
+                    list_rect.y,
+                    list_rect.width,
+                    list_rect.height,
+                    focused,
+                    &colors,
+                    &layout,
+                    app.icons_enabled,
+                );
+            }
 
-            // Render inline preview if space available
+            // Preview pane
             if let Some(prev_rect) = preview_rect {
-                // If video is playing, render the current frame
+                let preview_id = pane_id + 500;
+
                 if let Some(ref playback) = app.playback {
+                    // Video playback — always render new frames
                     if !playback.current_frame.is_empty() {
                         let dst = mkui::layout::ObjectFit::Contain.fit_with_aspect(
                             playback.width,
@@ -117,56 +131,72 @@ pub fn render_app(
                         });
                     }
                 } else {
-                    render_inline_preview(
-                        renderer,
-                        browser,
-                        &mut preview.cache,
-                        prev_rect,
-                        &colors,
-                    );
+                    // Static preview — track by cursor position
+                    let preview_gen = browser.cursor as u64;
+                    if tracker.needs_render(renderer, preview_id, preview_gen, prev_rect) {
+                        render_inline_preview(
+                            renderer,
+                            browser,
+                            &mut preview.cache,
+                            prev_rect,
+                            &colors,
+                        );
+                    }
                 }
             }
         });
 
-    // Render task/error pane
+    // Task/error pane
     if app.task_list.visible || app.error_list.visible {
-        let (jobs, cursor, title, empty_msg) = prepare_task_pane_data(app);
-        render::render_task_pane(
+        let task_bounds = Rect::new(0, main_height, width, list_pane_height);
+        let task_gen = app.job_queue.all_jobs().len() as u64;
+
+        if tracker.needs_render(renderer, ID_TASK_PANE, task_gen, task_bounds) {
+            let (jobs, cursor, title, empty_msg) = prepare_task_pane_data(app);
+            render::render_task_pane(
+                renderer,
+                &jobs,
+                cursor,
+                title,
+                empty_msg,
+                0,
+                main_height,
+                width,
+                list_pane_height,
+                app.focus_area == FocusArea::TaskList,
+                &colors,
+                &layout,
+            );
+        }
+    }
+
+    // Status bar
+    let status_y = height.saturating_sub(layout.status_height);
+    let status_bounds = Rect::new(0, status_y, width, layout.status_height);
+    // Mode + cursor position as generation
+    let status_gen = (app.mode as u64) << 48
+        | app.browser().map_or(0, |b| (b.cursor as u64) << 16 | b.entries.len() as u64);
+
+    if tracker.needs_render(renderer, ID_STATUS, status_gen, status_bounds) {
+        let cursor_info = app.browser().map(|b| (b.cursor, b.entries.len()));
+        render::render_status_bar(
             renderer,
-            &jobs,
-            cursor,
-            title,
-            empty_msg,
-            0,
-            main_height,
+            &app.mode,
+            &app.command_buffer,
+            &app.search_buffer,
+            app.last_search.as_deref(),
+            app.search_highlight,
+            &app.search_matches,
+            app.current_match,
+            app.job_queue.active_count(),
+            app.job_queue.failed_count(),
+            cursor_info,
+            status_y,
             width,
-            list_pane_height,
-            app.focus_area == FocusArea::TaskList,
             &colors,
             &layout,
         );
     }
-
-    // Render status bar
-    let status_y = height.saturating_sub(layout.status_height);
-    let cursor_info = app.browser().map(|b| (b.cursor, b.entries.len()));
-    render::render_status_bar(
-        renderer,
-        &app.mode,
-        &app.command_buffer,
-        &app.search_buffer,
-        app.last_search.as_deref(),
-        app.search_highlight,
-        &app.search_matches,
-        app.current_match,
-        app.job_queue.active_count(),
-        app.job_queue.failed_count(),
-        cursor_info,
-        status_y,
-        width,
-        &colors,
-        &layout,
-    );
 }
 
 fn render_inline_preview(
@@ -176,8 +206,6 @@ fn render_inline_preview(
     bounds: Rect,
     colors: &render::RenderColors,
 ) {
-
-    // Get current file under cursor
     if browser.cursor >= browser.entries.len() {
         return;
     }
@@ -186,6 +214,7 @@ fn render_inline_preview(
     let file_path = browser.path.join(&entry.name);
 
     if entry.is_dir {
+        let _ = renderer.fill_rect(bounds, colors.bg);
         let _ = renderer.move_cursor(bounds.x + 1, bounds.y + 1);
         let _ = renderer.write_styled(
             "(directory)",
@@ -194,20 +223,11 @@ fn render_inline_preview(
         return;
     }
 
-    // Load at a generous resolution — the renderer handles scaling
-    let content = cache.get_or_load(
-        &file_path,
-        1920,
-        1080,
-    );
-
+    let content = cache.get_or_load(&file_path, 1920, 1080);
     render_preview(renderer, content, bounds, colors.fg, colors.bg);
 }
 
-/// Calculate how wide the file list needs to be.
-/// Based on the longest visible filename + padding, clamped to reasonable bounds.
 fn calculate_list_width(browser: &crate::navigation::Browser, pane_width: u16) -> u16 {
-    // Find the longest filename in the visible entries
     let max_name_len = browser
         .entries
         .iter()
@@ -215,10 +235,7 @@ fn calculate_list_width(browser: &crate::navigation::Browser, pane_width: u16) -
         .max()
         .unwrap_or(10) as u16;
 
-    // Add padding for cursor indicator + margin
     let needed = max_name_len + 3;
-
-    // Clamp: at least MIN_LIST_WIDTH, at most MAX_LIST_RATIO of the pane
     let max_list = (pane_width as f32 * MAX_LIST_RATIO) as u16;
     needed.max(MIN_LIST_WIDTH).min(max_list)
 }

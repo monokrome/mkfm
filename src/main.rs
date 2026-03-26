@@ -48,18 +48,15 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let mut renderer = TerminalRenderer::new()?;
     renderer.enter_alt_screen()?;
     let mut preview = preview_state::PreviewState::new();
-    let mut dirty = true;
+    let mut tracker = mkui::component_state::RenderTracker::new();
 
     let events = EventPoller::new()?;
 
     loop {
-        // Render if needed
-        if dirty {
-            renderer.begin_frame()?;
-            app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
-            renderer.end_frame()?;
-            dirty = false;
-        }
+        // Render — tracker decides what actually gets painted
+        renderer.begin_frame()?;
+        app_render::render_app(&mut renderer, app, &app.theme, &mut preview, &mut tracker);
+        renderer.end_frame()?;
 
         // Short timeout when playing video, longer when idle
         let poll_timeout = if app.playback.as_ref().is_some_and(|p| p.playing) {
@@ -70,11 +67,10 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         let event = events.poll(poll_timeout)?;
 
         if let Some(event) = event {
-            dirty |= process_event(app, &event, &mut renderer)?;
+            let _ = process_event(app, &event, &mut renderer, &mut tracker)?;
 
-            // Drain remaining pending events
             while let Ok(Some(event)) = events.poll(Duration::ZERO) {
-                dirty |= process_event(app, &event, &mut renderer)?;
+                let _ = process_event(app, &event, &mut renderer, &mut tracker)?;
             }
         }
 
@@ -82,16 +78,10 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        dirty |= event_loop::poll_job_updates(app);
+        event_loop::poll_job_updates(app);
 
-        // Advance video playback if active
         if let Some(ref mut playback) = app.playback {
-            if playback.advance() {
-                dirty = true;
-            }
-            if playback.playing {
-                dirty = true; // keep rendering while playing
-            }
+            playback.advance();
         }
     }
 
@@ -112,6 +102,7 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mut preview = preview_state::PreviewState::new();
+    let mut tracker = mkui::component_state::RenderTracker::new();
     let mut overlay_initialized = false;
 
     MkuiApp::run_gui("mkfm", 16.0, move |event: &Event, renderer: &mut dyn Renderer| {
@@ -151,7 +142,7 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
             let _ = renderer.begin_frame();
             let _ = renderer.clear();
-            app_render::render_app(renderer, &app, &app.theme, &mut preview);
+            app_render::render_app(renderer, &app, &app.theme, &mut preview, &mut tracker);
             let _ = renderer.end_frame();
         }
 
@@ -166,6 +157,7 @@ fn process_event(
     app: &mut App,
     event: &mkui::event::Event,
     renderer: &mut mkui::tui::TerminalRenderer,
+    tracker: &mut mkui::component_state::RenderTracker,
 ) -> Result<bool, Box<dyn std::error::Error>> {
     use mkui::event::EventKind;
 
@@ -175,6 +167,7 @@ fn process_event(
         renderer.refresh_geometry()?;
         let _ = mkui::render::Renderer::clear(renderer);
         let _ = mkui::render::Renderer::clear_images(renderer);
+        tracker.invalidate_all();
         changed = true;
     }
 
