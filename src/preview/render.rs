@@ -55,7 +55,7 @@ fn render_image_preview(
     height: u32,
     bounds: Rect,
 ) {
-    let dst = ObjectFit::Contain.fit(width, height, bounds);
+    let dst = ObjectFit::Contain.fit_with_aspect(width, height, bounds, renderer.cell_aspect());
 
     // Preview images are loaded as RGBA
     let _ = renderer.render_image_rgba(&ImageParams {
