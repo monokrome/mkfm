@@ -137,19 +137,6 @@ fn render_inline_preview(
     bounds: Rect,
     colors: &render::RenderColors,
 ) {
-    // Draw a separator
-    let sep_style = Style::new().fg(colors.border);
-    for row in 0..bounds.height {
-        let _ = renderer.move_cursor(bounds.x, bounds.y + row);
-        let _ = renderer.write_styled("│", &sep_style);
-    }
-
-    let content_bounds = Rect::new(
-        bounds.x + 1,
-        bounds.y,
-        bounds.width.saturating_sub(1),
-        bounds.height,
-    );
 
     // Get current file under cursor
     if browser.cursor >= browser.entries.len() {
@@ -160,7 +147,7 @@ fn render_inline_preview(
     let file_path = browser.path.join(&entry.name);
 
     if entry.is_dir {
-        let _ = renderer.move_cursor(content_bounds.x + 1, content_bounds.y + 1);
+        let _ = renderer.move_cursor(bounds.x + 1, bounds.y + 1);
         let _ = renderer.write_styled(
             "(directory)",
             &Style::new().fg(colors.fg).dim(true),
@@ -168,14 +155,13 @@ fn render_inline_preview(
         return;
     }
 
-    // Load preview content
     let content = cache.get_or_load(
         &file_path,
-        content_bounds.width as u32 * 10,   // approximate pixel width
-        content_bounds.height as u32 * 20,   // approximate pixel height
+        bounds.width as u32 * 10,
+        bounds.height as u32 * 20,
     );
 
-    render_preview(renderer, content, content_bounds, colors.fg, colors.bg);
+    render_preview(renderer, content, bounds, colors.fg, colors.bg);
 }
 
 fn calculate_list_pane_height(app: &App, height: u16) -> u16 {
