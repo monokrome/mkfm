@@ -57,7 +57,8 @@ fn render_image_preview(
 ) {
     let dst = ObjectFit::Contain.fit(width, height, bounds);
 
-    let _ = renderer.render_image(&ImageParams {
+    // Preview images are loaded as RGBA
+    let _ = renderer.render_image_rgba(&ImageParams {
         data,
         width,
         height,
@@ -112,7 +113,7 @@ fn render_media_preview(
             let thumb_bounds = Rect::new(bounds.x, row, bounds.width, thumb_rows);
             let dst = ObjectFit::Contain.fit(thumb_width, thumb_height, thumb_bounds);
 
-            let _ = renderer.render_image(&ImageParams {
+            let _ = renderer.render_image_rgba(&ImageParams {
                 data,
                 width: thumb_width,
                 height: thumb_height,
