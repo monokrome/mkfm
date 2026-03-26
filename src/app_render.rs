@@ -13,10 +13,13 @@ use crate::preview_state::PreviewState;
 use crate::render;
 
 /// Minimum pane width to show inline preview
-const PREVIEW_MIN_WIDTH: u16 = 60;
+const PREVIEW_MIN_WIDTH: u16 = 40;
 
-/// Fraction of pane width used for preview (right side)
-const PREVIEW_WIDTH_RATIO: f32 = 0.4;
+/// Minimum columns for the file list
+const MIN_LIST_WIDTH: u16 = 20;
+
+/// Maximum fraction the file list can take
+const MAX_LIST_RATIO: f32 = 0.5;
 
 /// Render the entire application UI
 pub fn render_app(
@@ -60,8 +63,8 @@ pub fn render_app(
                 && pane_rect.width >= PREVIEW_MIN_WIDTH;
 
             let (list_rect, preview_rect) = if show_preview {
-                let preview_w = (pane_rect.width as f32 * app.preview_width_ratio) as u16;
-                let list_w = pane_rect.width.saturating_sub(preview_w);
+                let list_w = calculate_list_width(browser, pane_rect.width);
+                let preview_w = pane_rect.width.saturating_sub(list_w);
                 (
                     Rect::new(pane_rect.x, pane_rect.y, list_w, pane_rect.height),
                     Some(Rect::new(
@@ -177,6 +180,25 @@ fn render_inline_preview(
     );
 
     render_preview(renderer, content, bounds, colors.fg, colors.bg);
+}
+
+/// Calculate how wide the file list needs to be.
+/// Based on the longest visible filename + padding, clamped to reasonable bounds.
+fn calculate_list_width(browser: &crate::navigation::Browser, pane_width: u16) -> u16 {
+    // Find the longest filename in the visible entries
+    let max_name_len = browser
+        .entries
+        .iter()
+        .map(|e| e.name.len())
+        .max()
+        .unwrap_or(10) as u16;
+
+    // Add padding for cursor indicator + margin
+    let needed = max_name_len + 3;
+
+    // Clamp: at least MIN_LIST_WIDTH, at most MAX_LIST_RATIO of the pane
+    let max_list = (pane_width as f32 * MAX_LIST_RATIO) as u16;
+    needed.max(MIN_LIST_WIDTH).min(max_list)
 }
 
 fn calculate_list_pane_height(app: &App, height: u16) -> u16 {
