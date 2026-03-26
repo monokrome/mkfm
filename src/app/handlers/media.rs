@@ -147,12 +147,25 @@ impl App {
     fn start_playback(&mut self, path: &std::path::Path, start_seconds: f64) {
         let path_str = path.to_string_lossy().to_string();
 
-        let (width, height, fps) = match get_video_info(path) {
+        let (orig_width, orig_height, fps) = match get_video_info(path) {
             Some(info) => info,
             None => return,
         };
 
+        // Downscale to a reasonable size for terminal preview
+        // Max 320 pixels wide — keeps Kitty data manageable over SSH
+        let max_px = 320u32;
+        let (width, height) = if orig_width > max_px || orig_height > max_px {
+            let scale = max_px as f32 / orig_width.max(orig_height) as f32;
+            let w = ((orig_width as f32 * scale) as u32) & !1; // even dimensions
+            let h = ((orig_height as f32 * scale) as u32) & !1;
+            (w.max(2), h.max(2))
+        } else {
+            (orig_width & !1, orig_height & !1)
+        };
+
         let frame_size = (width * height * 3) as usize;
+        let scale_filter = format!("scale={}:{}", width, height);
 
         let mut video_cmd = Command::new("ffmpeg");
         video_cmd.arg("-i").arg(&path_str);
@@ -160,7 +173,7 @@ impl App {
             video_cmd.arg("-ss").arg(format!("{}", start_seconds));
         }
         video_cmd
-            .args(["-f", "rawvideo", "-pix_fmt", "rgb24", "-v", "quiet", "-"])
+            .args(["-vf", &scale_filter, "-f", "rawvideo", "-pix_fmt", "rgb24", "-v", "quiet", "-"])
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .stdin(Stdio::null());
@@ -175,6 +188,13 @@ impl App {
             None => return,
         };
 
+        // Set pipe to non-blocking so read() never blocks
+        let fd = video_stdout.as_raw_fd();
+        unsafe {
+            let flags = libc::fcntl(fd, libc::F_GETFL);
+            libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+        }
+
         let audio_child = start_audio(&path_str, start_seconds);
 
         self.playback = Some(VideoPlayback {
@@ -186,7 +206,8 @@ impl App {
             frame_size,
             width,
             height,
-            frame_duration: std::time::Duration::from_secs_f64(1.0 / fps),
+            // Cap at 10fps for terminal rendering — Kitty protocol is bandwidth-heavy
+            frame_duration: std::time::Duration::from_secs_f64(1.0 / fps.min(10.0)),
             last_frame: std::time::Instant::now(),
             current_frame: Vec::new(),
             playing: true,
