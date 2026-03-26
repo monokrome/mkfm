@@ -173,6 +173,8 @@ fn process_event(
 
     if let EventKind::Resize(_, _) = &event.kind {
         renderer.refresh_geometry()?;
+        let _ = mkui::render::Renderer::clear(renderer);
+        let _ = mkui::render::Renderer::clear_images(renderer);
         changed = true;
     }
 

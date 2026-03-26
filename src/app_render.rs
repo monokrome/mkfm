@@ -194,10 +194,11 @@ fn render_inline_preview(
         return;
     }
 
+    // Load at a generous resolution — the renderer handles scaling
     let content = cache.get_or_load(
         &file_path,
-        bounds.width as u32 * 10,
-        bounds.height as u32 * 20,
+        1920,
+        1080,
     );
 
     render_preview(renderer, content, bounds, colors.fg, colors.bg);

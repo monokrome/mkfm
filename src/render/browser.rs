@@ -56,6 +56,9 @@ pub fn render_browser_pane(
         0
     };
 
+    // Paint background for entire list area (clears old content)
+    let _ = renderer.fill_rect(Rect::new(x, list_y, width, list_height), colors.bg);
+
     for i in 0..visible_count {
         let entry_idx = scroll_offset + i;
         if entry_idx >= browser.entries.len() {
@@ -66,6 +69,7 @@ pub fn render_browser_pane(
         let entry = &browser.entries[entry_idx];
         let is_cursor = entry_idx == browser.cursor;
 
+        // Row background — cursor highlight or normal bg
         if is_cursor {
             let _ = renderer.fill_rect(Rect::new(x, row, width, 1), colors.cursor_bg);
         }

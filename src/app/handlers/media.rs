@@ -1,6 +1,7 @@
 //! Media playback handlers
 
 use std::io::Read;
+use std::os::fd::AsRawFd;
 use std::process::{Child, Command, Stdio};
 
 use super::super::App;
@@ -21,12 +22,25 @@ pub struct VideoPlayback {
 
 impl VideoPlayback {
     /// Read next frame if due. Returns true if a new frame is ready.
+    /// Non-blocking — returns false immediately if no data available.
     pub fn advance(&mut self) -> bool {
         if !self.playing {
             return false;
         }
 
         if self.last_frame.elapsed() < self.frame_duration {
+            return false;
+        }
+
+        // Non-blocking read — check if data is available first
+        let fd = self.video_stdout.as_raw_fd();
+        let mut pfd = libc::pollfd {
+            fd,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let ready = unsafe { libc::poll(&mut pfd, 1, 0) };
+        if ready <= 0 {
             return false;
         }
 
