@@ -34,8 +34,21 @@ pub fn render_app(
         .saturating_sub(layout.status_height)
         .saturating_sub(list_pane_height);
 
-    // Render split panes (file browsers)
+    // Draw borders between split panes
     let bounds = Rect::new(0, 0, width, main_height);
+    let pane_layout = app.splits.layout(bounds);
+    for (_, pane_rect) in &pane_layout {
+        if pane_rect.x > 0 {
+            let border_color = colors.border;
+            let border_style = Style::new().fg(border_color);
+            for row in 0..pane_rect.height {
+                let _ = renderer.move_cursor(pane_rect.x.saturating_sub(1), pane_rect.y + row);
+                let _ = renderer.write_styled("│", &border_style);
+            }
+        }
+    }
+
+    // Render split panes (file browsers)
     app.splits
         .render(bounds, |_leaf_id, pane_rect, browser, is_focused| {
             let focused = is_focused && app.focus_area == FocusArea::Splits;

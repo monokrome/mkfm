@@ -87,11 +87,4 @@ pub fn render_browser_pane(
         let _ = renderer.write_styled(display_name, &style);
     }
 
-    if focused {
-        let border_style = Style::new().fg(colors.border_focused);
-        for row in 0..height {
-            let _ = renderer.move_cursor(x + width.saturating_sub(1), y + row);
-            let _ = renderer.write_styled("│", &border_style);
-        }
-    }
 }
