@@ -1,6 +1,6 @@
 //! Color types and parsing
 
-use mkframe::{Color, TextColor};
+use mkui::theme::Color;
 
 /// RGB color for theme
 #[derive(Clone, Copy, Debug)]
@@ -15,12 +15,12 @@ impl Rgb {
         Self { r, g, b }
     }
 
-    pub fn to_text_color(self) -> TextColor {
-        TextColor::rgb(self.r, self.g, self.b)
+    pub fn to_color(self) -> Color {
+        Color::Rgb(self.r, self.g, self.b)
     }
 }
 
-/// RGBA color for theme
+/// RGBA color for theme (alpha used for canvas rendering, ignored in TUI)
 #[derive(Clone, Copy, Debug)]
 pub struct Rgba {
     pub r: u8,
@@ -35,7 +35,7 @@ impl Rgba {
     }
 
     pub fn to_color(self) -> Color {
-        Color::from_rgba8(self.r, self.g, self.b, self.a)
+        Color::Rgb(self.r, self.g, self.b)
     }
 }
 

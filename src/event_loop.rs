@@ -1,36 +1,27 @@
 //! Event loop helpers
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::app::App;
 use crate::jobs;
 
-/// Handle files dropped from external applications
-pub fn handle_drop_events(
-    app: &mut App,
-    drop_events: impl Iterator<Item = mkframe::DropEvent>,
-) -> bool {
-    let mut needs_redraw = false;
-
-    for drop_event in drop_events {
-        if drop_event.files.is_empty() {
-            continue;
-        }
-
-        if let Some(browser) = app.browser() {
-            let dest_dir = browser.path.clone();
-            for file in drop_event.files {
-                submit_copy_job(app, &file, &dest_dir);
-            }
-        }
-
-        if let Some(browser) = app.browser_mut() {
-            browser.refresh();
-        }
-        needs_redraw = true;
+/// Handle files dropped onto the window
+pub fn handle_drop_events(app: &mut App, files: &[PathBuf]) -> bool {
+    if files.is_empty() {
+        return false;
     }
 
-    needs_redraw
+    if let Some(browser) = app.browser() {
+        let dest_dir = browser.path.clone();
+        for file in files {
+            submit_copy_job(app, file, &dest_dir);
+        }
+    }
+
+    if let Some(browser) = app.browser_mut() {
+        browser.refresh();
+    }
+    true
 }
 
 fn submit_copy_job(app: &mut App, file: &Path, dest_dir: &Path) {
