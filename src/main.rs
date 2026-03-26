@@ -45,6 +45,7 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut renderer = TerminalRenderer::new()?;
     renderer.enter_alt_screen()?;
+    let mut preview_cache = preview::PreviewCache::new();
 
     let events = EventPoller::new()?;
 
@@ -52,7 +53,7 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         // Render
         renderer.begin_frame()?;
         renderer.clear()?;
-        app_render::render_app(&mut renderer, app, &app.theme);
+        app_render::render_app(&mut renderer, app, &app.theme, &mut preview_cache);
         renderer.end_frame()?;
 
         // Poll jobs
@@ -108,6 +109,8 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         rt.block_on(App::new(vec![], mkui::layout::SplitDirection::Vertical))
     });
 
+    let mut preview_cache = preview::PreviewCache::new();
+
     MkuiApp::run_gui("mkfm", 16.0, move |event: &Event, renderer: &mut dyn Renderer| {
         if let Some(key) = event.kind.pressed_key() {
             if let Some(key_str) = key_to_string(key, event) {
@@ -134,7 +137,7 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
             let _ = renderer.begin_frame();
             let _ = renderer.clear();
-            app_render::render_app(renderer, &app, &app.theme);
+            app_render::render_app(renderer, &app, &app.theme, &mut preview_cache);
             let _ = renderer.end_frame();
         }
 

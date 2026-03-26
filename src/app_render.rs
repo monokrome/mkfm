@@ -2,14 +2,28 @@
 
 use mkui::layout::Rect;
 use mkui::render::Renderer;
+use mkui::style::Style;
 
 use crate::app::{App, FocusArea};
 use crate::config::Theme;
 use crate::jobs::Job;
+use crate::preview::{self, PreviewCache};
+use crate::preview::render_preview;
 use crate::render;
 
+/// Minimum pane width to show inline preview
+const PREVIEW_MIN_WIDTH: u16 = 60;
+
+/// Fraction of pane width used for preview (right side)
+const PREVIEW_WIDTH_RATIO: f32 = 0.4;
+
 /// Render the entire application UI
-pub fn render_app(renderer: &mut dyn Renderer, app: &App, theme: &Theme) {
+pub fn render_app(
+    renderer: &mut dyn Renderer,
+    app: &App,
+    theme: &Theme,
+    preview_cache: &mut PreviewCache,
+) {
     let (width, height) = renderer.dimensions();
     let colors = render::RenderColors::from_theme(theme);
     let layout = render::RenderLayout::default();
@@ -24,6 +38,28 @@ pub fn render_app(renderer: &mut dyn Renderer, app: &App, theme: &Theme) {
     app.splits
         .render(bounds, |_leaf_id, pane_rect, browser, is_focused| {
             let focused = is_focused && app.focus_area == FocusArea::Splits;
+
+            // Determine if we should show inline preview
+            let show_preview = focused
+                && app.overlay_enabled
+                && pane_rect.width >= PREVIEW_MIN_WIDTH;
+
+            let (list_rect, preview_rect) = if show_preview {
+                let preview_w = (pane_rect.width as f32 * PREVIEW_WIDTH_RATIO) as u16;
+                let list_w = pane_rect.width.saturating_sub(preview_w);
+                (
+                    Rect::new(pane_rect.x, pane_rect.y, list_w, pane_rect.height),
+                    Some(Rect::new(
+                        pane_rect.x + list_w,
+                        pane_rect.y,
+                        preview_w,
+                        pane_rect.height,
+                    )),
+                )
+            } else {
+                (pane_rect, None)
+            };
+
             render::render_browser_pane(
                 renderer,
                 browser,
@@ -31,15 +67,26 @@ pub fn render_app(renderer: &mut dyn Renderer, app: &App, theme: &Theme) {
                 app.search_highlight,
                 &app.search_matches,
                 theme,
-                pane_rect.x,
-                pane_rect.y,
-                pane_rect.width,
-                pane_rect.height,
+                list_rect.x,
+                list_rect.y,
+                list_rect.width,
+                list_rect.height,
                 focused,
                 &colors,
                 &layout,
                 app.icons_enabled,
             );
+
+            // Render inline preview if space available
+            if let Some(prev_rect) = preview_rect {
+                render_inline_preview(
+                    renderer,
+                    browser,
+                    preview_cache,
+                    prev_rect,
+                    &colors,
+                );
+            }
         });
 
     // Render task/error pane
@@ -81,6 +128,54 @@ pub fn render_app(renderer: &mut dyn Renderer, app: &App, theme: &Theme) {
         &colors,
         &layout,
     );
+}
+
+fn render_inline_preview(
+    renderer: &mut dyn Renderer,
+    browser: &crate::navigation::Browser,
+    cache: &mut PreviewCache,
+    bounds: Rect,
+    colors: &render::RenderColors,
+) {
+    // Draw a separator
+    let sep_style = Style::new().fg(colors.border);
+    for row in 0..bounds.height {
+        let _ = renderer.move_cursor(bounds.x, bounds.y + row);
+        let _ = renderer.write_styled("│", &sep_style);
+    }
+
+    let content_bounds = Rect::new(
+        bounds.x + 1,
+        bounds.y,
+        bounds.width.saturating_sub(1),
+        bounds.height,
+    );
+
+    // Get current file under cursor
+    if browser.cursor >= browser.entries.len() {
+        return;
+    }
+
+    let entry = &browser.entries[browser.cursor];
+    let file_path = browser.path.join(&entry.name);
+
+    if entry.is_dir {
+        let _ = renderer.move_cursor(content_bounds.x + 1, content_bounds.y + 1);
+        let _ = renderer.write_styled(
+            "(directory)",
+            &Style::new().fg(colors.fg).dim(true),
+        );
+        return;
+    }
+
+    // Load preview content
+    let content = cache.get_or_load(
+        &file_path,
+        content_bounds.width as u32 * 10,   // approximate pixel width
+        content_bounds.height as u32 * 20,   // approximate pixel height
+    );
+
+    render_preview(renderer, content, content_bounds, colors.fg, colors.bg);
 }
 
 fn calculate_list_pane_height(app: &App, height: u16) -> u16 {
