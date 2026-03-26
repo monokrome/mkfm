@@ -52,46 +52,26 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let events = EventPoller::new()?;
 
     loop {
-        // Render
-        renderer.begin_frame()?;
-        renderer.clear()?;
-        app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
-        renderer.end_frame()?;
-
-        // Poll jobs
-        if event_loop::poll_job_updates(app) {
-            continue;
-        }
-
-        // Handle input
+        // Wait for at least one event
         let event = events.read()?;
+        process_event(app, &event, &mut renderer)?;
 
-        if let EventKind::Resize(_, _) = &event.kind {
-            renderer.refresh_geometry()?;
-            continue;
-        }
-
-        if let Some(key) = event.kind.pressed_key() {
-            if let Some(key_str) = key_to_string(key, &event) {
-                app.process_key(&key_str);
-            }
-        }
-
-        // Handle mouse events
-        if let EventKind::Mouse(mouse) = &event.kind {
-            let (w, h) = renderer.dimensions();
-            let ctrl = matches!(&event.kind, EventKind::Mouse(mkui::event::MouseEvent::Button { modifiers, .. }) if modifiers.ctrl);
-            app.handle_mouse_event(mouse, w, h, ctrl);
-        }
-
-        // Handle drop events
-        if let EventKind::Drop(files) = &event.kind {
-            event_loop::handle_drop_events(app, files);
+        // Drain all pending events before rendering
+        while let Ok(Some(event)) = events.poll(std::time::Duration::ZERO) {
+            process_event(app, &event, &mut renderer)?;
         }
 
         if app.should_exit {
             break;
         }
+
+        event_loop::poll_job_updates(app);
+
+        // Single render after all events processed
+        renderer.begin_frame()?;
+        renderer.clear()?;
+        app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
+        renderer.end_frame()?;
     }
 
     Ok(())
@@ -158,6 +138,36 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
         true
     })?;
+
+    Ok(())
+}
+
+fn process_event(
+    app: &mut App,
+    event: &mkui::event::Event,
+    renderer: &mut mkui::tui::TerminalRenderer,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use mkui::event::EventKind;
+
+    if let EventKind::Resize(_, _) = &event.kind {
+        renderer.refresh_geometry()?;
+    }
+
+    if let Some(key) = event.kind.pressed_key() {
+        if let Some(key_str) = key_to_string(key, event) {
+            app.process_key(&key_str);
+        }
+    }
+
+    if let EventKind::Mouse(mouse) = &event.kind {
+        let (w, h) = mkui::render::Renderer::dimensions(renderer);
+        let ctrl = matches!(&event.kind, EventKind::Mouse(mkui::event::MouseEvent::Button { modifiers, .. }) if modifiers.ctrl);
+        app.handle_mouse_event(mouse, w, h, ctrl);
+    }
+
+    if let EventKind::Drop(files) = &event.kind {
+        event_loop::handle_drop_events(app, files);
+    }
 
     Ok(())
 }
