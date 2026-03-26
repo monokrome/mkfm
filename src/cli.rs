@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use mkframe::SplitDirection;
+use crate::split::SplitDirection;
 
 /// A start path with optional files to select
 #[derive(Debug, Clone)]

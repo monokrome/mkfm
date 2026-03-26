@@ -21,7 +21,7 @@ use crate::input::{Action, Mode, SortMode, handle_key};
 use crate::jobs;
 use crate::navigation::{Browser, Clipboard, Selection};
 
-use mkframe::{SplitDirection, SplitTree};
+use crate::split::{SplitDirection, SplitTree};
 
 /// Result of executing a command
 pub enum CommandResult {

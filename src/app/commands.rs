@@ -66,8 +66,14 @@ impl App {
             "wq" | "x" => self.cmd_write_quit(),
             "filter" | "f" => self.cmd_clear_filter(),
             "ln" | "symlink" => self.cmd_symlink(),
+            "features" => self.cmd_toggle_features(),
             _ => CommandResult::Redraw,
         }
+    }
+
+    fn cmd_toggle_features(&mut self) -> CommandResult {
+        self.execute_toggle_feature_list();
+        CommandResult::Redraw
     }
 
     fn cmd_quit(&mut self) -> CommandResult {

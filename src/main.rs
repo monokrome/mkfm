@@ -14,6 +14,7 @@ mod navigation;
 mod preview;
 mod preview_state;
 mod render;
+mod split;
 
 use app::App;
 use config::Theme;

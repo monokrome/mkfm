@@ -1,0 +1,18 @@
+   Compiling mkframe v0.1.2 (/home/polar/Documents/Projects/github.com/monokrome/mkframe)
+   Compiling mkfm v0.1.2 (/home/polar/Documents/Projects/github.com/monokrome/mkfm)
+    Finished `release` profile [optimized] target(s) in 26.02s
+     Running `target/release/mkfm /tmp`
+[mkframe] attached surface configure: requested=400x434, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x385, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x158, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x405, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x244, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x317, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x257, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x257, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x317, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x257, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x336, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x592, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x336, compositor sent=200x200
+[mkframe] attached surface configure: requested=400x257, compositor sent=200x200
