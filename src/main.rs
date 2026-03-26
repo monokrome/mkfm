@@ -50,8 +50,13 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     let events = EventPoller::new()?;
 
+    // Initial render before waiting for input
+    renderer.begin_frame()?;
+    renderer.clear()?;
+    app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
+    renderer.end_frame()?;
+
     loop {
-        // Wait for at least one event
         let event = events.read()?;
         process_event(app, &event, &mut renderer)?;
 
