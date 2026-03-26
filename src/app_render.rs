@@ -62,9 +62,14 @@ pub fn render_app(
             let focused = is_focused && app.focus_area == FocusArea::Splits;
             let pane_id = leaf_id.0;
 
-            // Use cursor + entry count as a simple generation for the browser
-            let browser_gen = (browser.cursor as u64) << 32
-                | (browser.entries.len() as u64);
+            // Generation: hash of path + cursor + entry count
+            // Path hash ensures directory changes trigger repaint
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            browser.path.hash(&mut hasher);
+            browser.cursor.hash(&mut hasher);
+            browser.entries.len().hash(&mut hasher);
+            let browser_gen = hasher.finish();
 
             let show_preview = focused
                 && app.overlay_enabled
@@ -87,8 +92,8 @@ pub fn render_app(
                 (pane_rect, None)
             };
 
-            // Check if browser pane needs rendering
-            if tracker.needs_render(renderer, pane_id, browser_gen, list_rect) {
+            // Track the full pane — not just the list portion
+            if tracker.needs_render(renderer, pane_id, browser_gen, pane_rect) {
                 render::render_browser_pane(
                     renderer,
                     browser,
@@ -107,12 +112,11 @@ pub fn render_app(
                 );
             }
 
-            // Preview pane
+            // Preview pane — uses same generation as browser so they stay in sync
             if let Some(prev_rect) = preview_rect {
                 let preview_id = pane_id + 500;
 
                 if let Some(ref playback) = app.playback {
-                    // Video playback — always render new frames
                     if !playback.current_frame.is_empty() {
                         let dst = mkui::layout::ObjectFit::Contain.fit_with_aspect(
                             playback.width,
@@ -131,9 +135,8 @@ pub fn render_app(
                         });
                     }
                 } else {
-                    // Static preview — track by cursor position
-                    let preview_gen = browser.cursor as u64;
-                    if tracker.needs_render(renderer, preview_id, preview_gen, prev_rect) {
+                    // Static preview — same generation as browser pane
+                    if tracker.needs_render(renderer, preview_id, browser_gen, prev_rect) {
                         render_inline_preview(
                             renderer,
                             browser,
