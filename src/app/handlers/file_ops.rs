@@ -150,13 +150,42 @@ impl App {
     }
 
     pub fn execute_delete(&mut self) -> bool {
-        if let Some(browser) = self.browser()
-            && let Some(entry) = browser.current_entry()
-        {
-            let _ = filesystem::delete(&entry.path);
+        let paths = self.selected_paths();
+        if paths.is_empty() {
+            if let Some(browser) = self.browser() {
+                if let Some(entry) = browser.current_entry() {
+                    self.pending_confirm = Some(crate::app::PendingAction::Delete(vec![entry.path.clone()]));
+                    return true;
+                }
+            }
+            return false;
         }
-        self.refresh_browser();
+        self.pending_confirm = Some(crate::app::PendingAction::Delete(paths));
         true
+    }
+
+    pub fn confirm_pending(&mut self) -> bool {
+        let Some(action) = self.pending_confirm.take() else {
+            return false;
+        };
+        match action {
+            crate::app::PendingAction::Delete(paths) => {
+                for path in &paths {
+                    let _ = filesystem::delete(path);
+                }
+                self.refresh_browser();
+                true
+            }
+        }
+    }
+
+    pub fn cancel_pending(&mut self) -> bool {
+        if self.pending_confirm.is_some() {
+            self.pending_confirm = None;
+            true
+        } else {
+            false
+        }
     }
 
     pub fn execute_trash(&mut self) -> bool {

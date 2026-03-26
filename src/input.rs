@@ -246,9 +246,11 @@ pub fn handle_normal_key(key: &str, pending: &str) -> Action {
         (_, "h") | (_, "-") => Action::ParentDirectory,
         (_, " ") => Action::MediaPlayPause,
         (_, "v") => Action::EnterVisualMode,
-        (_, "d") => Action::Cut,
+        // dd = delete with confirmation
+        ("d", "d") => Action::Delete,
+        ("", "d") => Action::Pending,
         (_, "p") => Action::Paste,
-        (_, "x") => Action::Delete,
+        (_, "x") => Action::Cut,
         (_, "X") => Action::Trash,
         (_, ".") => Action::ToggleHidden,
         (_, ":") => Action::EnterCommandMode,

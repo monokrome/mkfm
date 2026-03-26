@@ -32,6 +32,12 @@ pub enum CommandResult {
     Exit,
 }
 
+/// An action waiting for user confirmation
+#[derive(Clone, Debug)]
+pub enum PendingAction {
+    Delete(Vec<std::path::PathBuf>),
+}
+
 /// Which area of the UI has focus
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FocusArea {
@@ -97,6 +103,8 @@ pub struct App {
     pub media_position: f64,
     // Preview content zoom (1.0 = fit to preview area, 2.0 = 200%)
     pub preview_zoom: f32,
+    // Pending confirmation (e.g., "delete? press y to confirm")
+    pub pending_confirm: Option<PendingAction>,
 }
 
 impl App {
@@ -195,6 +203,7 @@ impl App {
             media_path: None,
             media_position: 0.0,
             preview_zoom: 1.0,
+            pending_confirm: None,
         }
     }
 
@@ -248,6 +257,14 @@ impl App {
 
     /// Process a key press
     pub fn process_key(&mut self, key_str: &str) -> bool {
+        // Handle pending confirmation first
+        if self.pending_confirm.is_some() {
+            return match key_str {
+                "y" | "Y" => self.confirm_pending(),
+                _ => self.cancel_pending(),
+            };
+        }
+
         if (self.mode == Mode::Normal || self.mode == Mode::Visual)
             && let Some(digit) = key_str.chars().next().filter(|c| c.is_ascii_digit())
         {

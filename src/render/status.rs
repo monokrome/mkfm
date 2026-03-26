@@ -20,6 +20,7 @@ pub fn render_status_bar(
     _active_jobs: usize,
     _failed_jobs: usize,
     cursor_info: Option<(usize, usize)>,
+    confirm_message: Option<&str>,
     y: u16,
     width: u16,
     colors: &RenderColors,
@@ -29,6 +30,16 @@ pub fn render_status_bar(
         mkui::layout::Rect::new(0, y, width, 1),
         colors.status_bg,
     );
+
+    // Show confirmation prompt if pending
+    if let Some(msg) = confirm_message {
+        let _ = renderer.move_cursor(1, y);
+        let _ = renderer.write_styled(
+            msg,
+            &Style::new().bg(colors.status_bg).fg(mkui::theme::Color::rgb(255, 200, 100)).bold(true),
+        );
+        return;
+    }
 
     let mode_str = match mode {
         Mode::Normal => "NORMAL",
