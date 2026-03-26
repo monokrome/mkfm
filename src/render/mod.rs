@@ -2,6 +2,7 @@
 
 mod browser;
 mod status;
+mod tasks;
 
 use mkui::theme::Color;
 
@@ -9,6 +10,7 @@ use crate::config::Theme;
 
 pub use browser::render_browser_pane;
 pub use status::render_status_bar;
+pub use tasks::render_task_pane;
 
 /// Pre-converted theme colors for rendering
 pub struct RenderColors {

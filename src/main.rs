@@ -75,6 +75,13 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        // Handle mouse events
+        if let EventKind::Mouse(mouse) = &event.kind {
+            let (w, h) = renderer.dimensions();
+            let ctrl = matches!(&event.kind, EventKind::Mouse(mkui::event::MouseEvent::Button { modifiers, .. }) if modifiers.ctrl);
+            app.handle_mouse_event(mouse, w, h, ctrl);
+        }
+
         // Handle drop events
         if let EventKind::Drop(files) = &event.kind {
             event_loop::handle_drop_events(app, files);
@@ -107,6 +114,12 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             if let Some(key_str) = key_to_string(key, event) {
                 app.process_key(&key_str);
             }
+        }
+
+        if let EventKind::Mouse(mouse) = &event.kind {
+            let (w, h) = renderer.dimensions();
+            let ctrl = matches!(&event.kind, EventKind::Mouse(mkui::event::MouseEvent::Button { modifiers, .. }) if modifiers.ctrl);
+            app.handle_mouse_event(mouse, w, h, ctrl);
         }
 
         if let EventKind::Drop(files) = &event.kind {
