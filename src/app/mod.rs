@@ -95,8 +95,8 @@ pub struct App {
     pub playback: Option<crate::app::handlers::media::VideoPlayback>,
     pub media_path: Option<PathBuf>,
     pub media_position: f64,
-    // Preview sizing
-    pub preview_width_ratio: f32,
+    // Preview sizing — None means auto (based on filename width)
+    pub preview_zoom: Option<f32>,
 }
 
 impl App {
@@ -194,7 +194,7 @@ impl App {
             playback: None,
             media_path: None,
             media_position: 0.0,
-            preview_width_ratio: 0.4,
+            preview_zoom: None,
         }
     }
 
@@ -285,6 +285,9 @@ impl App {
             // Count overrides default seek seconds
             Action::MediaSeekBack(_) => self.execute(Action::MediaSeekBack(count as i32)),
             Action::MediaSeekForward(_) => self.execute(Action::MediaSeekForward(count as i32)),
+            // Count sets absolute zoom percentage
+            Action::MediaZoomIn => self.execute_media_zoom(true, Some(count)),
+            Action::MediaZoomOut => self.execute_media_zoom(false, Some(count)),
             _ => self.execute(action),
         }
     }

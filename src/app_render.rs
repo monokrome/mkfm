@@ -77,7 +77,13 @@ pub fn render_app(
                 && pane_rect.width >= PREVIEW_MIN_WIDTH;
 
             let (list_rect, preview_rect) = if show_preview {
-                let list_w = calculate_list_width(browser, pane_rect.width);
+                let list_w = if let Some(zoom) = app.preview_zoom {
+                    // Zoom overrides: preview gets `zoom` fraction, list gets the rest
+                    let preview_w = (pane_rect.width as f32 * zoom) as u16;
+                    pane_rect.width.saturating_sub(preview_w).max(MIN_LIST_WIDTH)
+                } else {
+                    calculate_list_width(browser, pane_rect.width)
+                };
                 let preview_w = pane_rect.width.saturating_sub(list_w);
                 (
                     Rect::new(pane_rect.x, pane_rect.y, list_w, pane_rect.height),

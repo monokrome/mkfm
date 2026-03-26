@@ -94,8 +94,8 @@ impl App {
             Action::MediaPlayPause => self.execute_media_play_pause(),
             Action::MediaSeekBack(secs) => self.execute_media_seek(-secs),
             Action::MediaSeekForward(secs) => self.execute_media_seek(secs),
-            Action::MediaZoomIn => self.execute_media_zoom(true),
-            Action::MediaZoomOut => self.execute_media_zoom(false),
+            Action::MediaZoomIn => self.execute_media_zoom(true, None),
+            Action::MediaZoomOut => self.execute_media_zoom(false, None),
         }
     }
 
