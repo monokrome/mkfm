@@ -3,7 +3,6 @@
 mod app;
 mod app_render;
 mod attached_surface;
-mod overlay;
 mod cli;
 mod config;
 mod event_loop;
@@ -13,6 +12,7 @@ mod filesystem;
 mod input;
 mod jobs;
 mod navigation;
+mod overlay;
 mod preview;
 mod preview_state;
 mod render;
@@ -43,39 +43,42 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     use mkui::event::EventPoller;
     use mkui::render::Renderer;
     use mkui::tui::TerminalRenderer;
+    use std::time::Duration;
 
     let mut renderer = TerminalRenderer::new()?;
     renderer.enter_alt_screen()?;
     let mut preview = preview_state::PreviewState::new();
+    let mut dirty = true;
 
     let events = EventPoller::new()?;
 
-    // Initial render before waiting for input
-    renderer.begin_frame()?;
-    renderer.clear()?;
-    app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
-    renderer.end_frame()?;
-
     loop {
-        let event = events.read()?;
-        process_event(app, &event, &mut renderer)?;
+        // Render if needed
+        if dirty {
+            renderer.begin_frame()?;
+            renderer.clear()?;
+            app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
+            renderer.end_frame()?;
+            dirty = false;
+        }
 
-        // Drain all pending events before rendering
-        while let Ok(Some(event)) = events.poll(std::time::Duration::ZERO) {
-            process_event(app, &event, &mut renderer)?;
+        // Poll with timeout — allows async updates to trigger redraws
+        let event = events.poll(Duration::from_millis(100))?;
+
+        if let Some(event) = event {
+            dirty |= process_event(app, &event, &mut renderer)?;
+
+            // Drain remaining pending events
+            while let Ok(Some(event)) = events.poll(Duration::ZERO) {
+                dirty |= process_event(app, &event, &mut renderer)?;
+            }
         }
 
         if app.should_exit {
             break;
         }
 
-        event_loop::poll_job_updates(app);
-
-        // Single render after all events processed
-        renderer.begin_frame()?;
-        renderer.clear()?;
-        app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
-        renderer.end_frame()?;
+        dirty |= event_loop::poll_job_updates(app);
     }
 
     Ok(())
@@ -86,7 +89,6 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     use mkui::event::{Event, EventKind};
     use mkui::render::Renderer;
 
-    // Take ownership of app for the GUI closure
     let mut app = std::mem::replace(app, {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -99,11 +101,11 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let mut overlay_initialized = false;
 
     MkuiApp::run_gui("mkfm", 16.0, move |event: &Event, renderer: &mut dyn Renderer| {
-        // Initialize overlay on first frame
         if !overlay_initialized {
             preview.init_overlay(renderer);
             overlay_initialized = true;
         }
+
         if let Some(key) = event.kind.pressed_key() {
             if let Some(key_str) = key_to_string(key, event) {
                 app.process_key(&key_str);
@@ -127,7 +129,6 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         if matches!(event.kind, EventKind::Redraw) {
             event_loop::poll_job_updates(&mut app);
 
-            // Update overlay with current file
             let current_file = app.browser().and_then(|b| {
                 b.entries.get(b.cursor).map(|e| b.path.join(&e.name))
             });
@@ -146,34 +147,38 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Process a single event, returns true if state changed (needs redraw)
 fn process_event(
     app: &mut App,
     event: &mkui::event::Event,
     renderer: &mut mkui::tui::TerminalRenderer,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<bool, Box<dyn std::error::Error>> {
     use mkui::event::EventKind;
+
+    let mut changed = false;
 
     if let EventKind::Resize(_, _) = &event.kind {
         renderer.refresh_geometry()?;
+        changed = true;
     }
 
     if let Some(key) = event.kind.pressed_key() {
         if let Some(key_str) = key_to_string(key, event) {
-            app.process_key(&key_str);
+            changed |= app.process_key(&key_str);
         }
     }
 
     if let EventKind::Mouse(mouse) = &event.kind {
         let (w, h) = mkui::render::Renderer::dimensions(renderer);
         let ctrl = matches!(&event.kind, EventKind::Mouse(mkui::event::MouseEvent::Button { modifiers, .. }) if modifiers.ctrl);
-        app.handle_mouse_event(mouse, w, h, ctrl);
+        changed |= app.handle_mouse_event(mouse, w, h, ctrl);
     }
 
     if let EventKind::Drop(files) = &event.kind {
-        event_loop::handle_drop_events(app, files);
+        changed |= event_loop::handle_drop_events(app, files);
     }
 
-    Ok(())
+    Ok(changed)
 }
 
 /// Convert mkui Key to the string format mkfm's input system expects
