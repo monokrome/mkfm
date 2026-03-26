@@ -55,13 +55,9 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         // Render if needed
         if dirty {
-            let playing = app.playback.as_ref().is_some_and(|p| p.playing);
-            renderer.hide_cursor()?;
-            if !playing {
-                renderer.clear()?;
-            }
+            renderer.begin_frame()?;
             app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
-            renderer.flush()?;
+            renderer.end_frame()?;
             dirty = false;
         }
 
