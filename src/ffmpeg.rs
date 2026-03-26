@@ -176,8 +176,8 @@ fn extract_thumbnail(path: &Path, max_width: u32, max_height: u32) -> (Option<Ve
 
     match output {
         Ok(out) if out.status.success() && !out.stdout.is_empty() => {
-            // We need to know the actual dimensions from ffprobe
-            let (w, h) = get_frame_dimensions(path, max_width, max_height);
+            // Calculate actual dimensions from data size and aspect ratio
+            let (w, h) = dimensions_from_rgba_data(out.stdout.len(), path, max_width, max_height);
             if w > 0 && h > 0 {
                 (Some(out.stdout), w, h)
             } else {
@@ -186,6 +186,55 @@ fn extract_thumbnail(path: &Path, max_width: u32, max_height: u32) -> (Option<Ve
         }
         _ => (None, 0, 0),
     }
+}
+
+/// Calculate dimensions from RGBA data size using the video's aspect ratio
+fn dimensions_from_rgba_data(data_len: usize, path: &Path, max_width: u32, max_height: u32) -> (u32, u32) {
+    let total_pixels = data_len / 4;
+    if total_pixels == 0 {
+        return (0, 0);
+    }
+
+    // Get the original video aspect ratio
+    let (orig_w, orig_h) = get_original_dimensions(path);
+    if orig_w == 0 || orig_h == 0 {
+        return (0, 0);
+    }
+
+    let aspect = orig_w as f64 / orig_h as f64;
+
+    // Solve: w * h = total_pixels, w/h = aspect
+    // w = aspect * h, so aspect * h * h = total_pixels
+    let h = ((total_pixels as f64) / aspect).sqrt() as u32;
+    let w = (h as f64 * aspect) as u32;
+
+    // Validate — the result should be close to total_pixels
+    if w > 0 && h > 0 && (w * h).abs_diff(total_pixels as u32) < w + h {
+        (w, h)
+    } else {
+        // Fallback to probed dimensions
+        get_frame_dimensions(path, max_width, max_height)
+    }
+}
+
+/// Get the original video dimensions (before any scaling)
+fn get_original_dimensions(path: &Path) -> (u32, u32) {
+    let output = Command::new("ffprobe")
+        .args(["-v", "error", "-select_streams", "v:0",
+               "-show_entries", "stream=width,height", "-of", "csv=p=0"])
+        .arg(path)
+        .output();
+
+    if let Ok(out) = output {
+        let s = String::from_utf8_lossy(&out.stdout);
+        let parts: Vec<&str> = s.trim().split(',').collect();
+        if parts.len() == 2 {
+            if let (Ok(w), Ok(h)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                return (w, h);
+            }
+        }
+    }
+    (0, 0)
 }
 
 fn get_frame_dimensions(path: &Path, max_width: u32, max_height: u32) -> (u32, u32) {
