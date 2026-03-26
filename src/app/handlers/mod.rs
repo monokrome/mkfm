@@ -11,4 +11,5 @@ mod search;
 mod search_match;
 mod split;
 mod task;
+mod media;
 mod toggle;

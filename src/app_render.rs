@@ -60,7 +60,7 @@ pub fn render_app(
                 && pane_rect.width >= PREVIEW_MIN_WIDTH;
 
             let (list_rect, preview_rect) = if show_preview {
-                let preview_w = (pane_rect.width as f32 * PREVIEW_WIDTH_RATIO) as u16;
+                let preview_w = (pane_rect.width as f32 * app.preview_width_ratio) as u16;
                 let list_w = pane_rect.width.saturating_sub(preview_w);
                 (
                     Rect::new(pane_rect.x, pane_rect.y, list_w, pane_rect.height),

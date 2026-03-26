@@ -89,6 +89,13 @@ impl App {
             Action::PrevError => self.execute_prev_error(),
             Action::ToggleErrorList => self.execute_toggle_error_list(),
             Action::ToggleFeatureList => self.execute_toggle_feature_list(),
+
+            // Media playback
+            Action::MediaPlayPause => self.execute_media_play_pause(),
+            Action::MediaSeekBack(secs) => self.execute_media_seek(-secs),
+            Action::MediaSeekForward(secs) => self.execute_media_seek(secs),
+            Action::MediaZoomIn => self.execute_media_zoom(true),
+            Action::MediaZoomOut => self.execute_media_zoom(false),
         }
     }
 

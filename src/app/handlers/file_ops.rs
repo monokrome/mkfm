@@ -9,6 +9,14 @@ use crate::jobs;
 
 impl App {
     pub fn execute_open_file(&mut self) -> bool {
+        // If current entry is a directory, enter it
+        if let Some(entry) = self.browser().and_then(|b| b.current_entry()) {
+            if entry.is_dir {
+                return self.execute_enter_directory();
+            }
+        }
+
+        // Otherwise open the file
         let paths = self.get_paths_for_open();
         if !paths.is_empty() {
             self.openers.open_files(&paths);

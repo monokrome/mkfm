@@ -91,6 +91,12 @@ pub struct App {
     // Features
     pub feature_list: features::FeatureList,
     pub feature_pane: features::FeatureListPane,
+    // Media playback
+    pub media_child: Option<std::process::Child>,
+    pub media_path: Option<PathBuf>,
+    pub media_position: f64,
+    // Preview sizing
+    pub preview_width_ratio: f32,
 }
 
 impl App {
@@ -185,6 +191,10 @@ impl App {
             dragging: false,
             feature_list: features::FeatureList::new(),
             feature_pane: features::FeatureListPane::new(),
+            media_child: None,
+            media_path: None,
+            media_position: 0.0,
+            preview_width_ratio: 0.4,
         }
     }
 
@@ -265,13 +275,16 @@ impl App {
     }
 
     fn execute_with_count(&mut self, action: Action, count: usize) -> bool {
-        match &action {
+        match action {
             Action::MoveCursor(_) | Action::NextDirectory | Action::PrevDirectory => {
                 for _ in 0..count {
                     self.execute(action.clone());
                 }
                 true
             }
+            // Count overrides default seek seconds
+            Action::MediaSeekBack(_) => self.execute(Action::MediaSeekBack(count as i32)),
+            Action::MediaSeekForward(_) => self.execute(Action::MediaSeekForward(count as i32)),
             _ => self.execute(action),
         }
     }

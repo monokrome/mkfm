@@ -121,6 +121,12 @@ pub enum Action {
     ToggleErrorList,
     // Feature list
     ToggleFeatureList,
+    // Media playback
+    MediaPlayPause,
+    MediaSeekBack(i32),
+    MediaSeekForward(i32),
+    MediaZoomIn,
+    MediaZoomOut,
 }
 
 pub fn handle_normal_key(key: &str, pending: &str) -> Action {
@@ -182,6 +188,15 @@ pub fn handle_normal_key(key: &str, pending: &str) -> Action {
 
         // gg goes to top
         ("g", "g") => Action::CursorToTop,
+
+        // gm - media prefix
+        ("gm", "p") => Action::MediaPlayPause,
+        ("gm", "h") => Action::MediaSeekBack(15),
+        ("gm", "l") => Action::MediaSeekForward(15),
+        ("gm", "j") => Action::MediaZoomOut,
+        ("gm", "k") => Action::MediaZoomIn,
+        ("g", "m") => Action::Pending,
+
         ("", "g") => Action::Pending,
 
         // Ctrl+w split commands (vim-style)
@@ -226,9 +241,10 @@ pub fn handle_normal_key(key: &str, pending: &str) -> Action {
         (_, "j") => Action::MoveCursor(1),
         (_, "k") => Action::MoveCursor(-1),
         (_, "G") => Action::CursorToBottom,
-        (_, "l") | (_, "\n") => Action::EnterDirectory,
+        (_, "l") => Action::EnterDirectory,
+        (_, "\n") => Action::OpenFile,
         (_, "h") | (_, "-") => Action::ParentDirectory,
-        (_, "=") => Action::OpenFile,
+        (_, " ") => Action::MediaPlayPause,
         (_, "v") => Action::EnterVisualMode,
         (_, "d") => Action::Cut,
         (_, "p") => Action::Paste,
