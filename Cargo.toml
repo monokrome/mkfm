@@ -9,6 +9,15 @@ license = "GPL-3.0"
 # UI toolkit
 mkui = { path = "../mkui" }
 
+# Wayland (for attached surface overlay)
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client"] }
+wayland-backend = "0.3"
+wayland-scanner = "0.31"
+
+# Window access (for Wayland handle detection)
+winit = "0.30"
+
 # Image loading and EXIF
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 kamadak-exif = "0.6"

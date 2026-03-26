@@ -1645,6 +1645,11 @@ dependencies = [
  "tokio",
  "toml",
  "walkdir",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
+ "wayland-scanner",
+ "winit",
 ]
 
 [[package]]

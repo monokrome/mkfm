@@ -2,6 +2,7 @@
 
 mod app;
 mod app_render;
+mod attached_surface;
 mod cli;
 mod config;
 mod event_loop;
