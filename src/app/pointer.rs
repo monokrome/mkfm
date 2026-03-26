@@ -1,9 +1,9 @@
 //! Mouse event handling (click, scroll, drag)
 
-use mkui::event::MouseEvent;
+use mkui::event::{DoubleClickDetector, MouseEvent};
 use mkui::layout::Rect;
 
-use super::pointer_helpers::{DoubleClickChecker, PointerLayout};
+use super::pointer_helpers::PointerLayout;
 use super::{App, FocusArea};
 use crate::input::Action;
 
@@ -150,11 +150,7 @@ impl App {
     }
 
     fn check_double_click(&mut self, x: f64, y: f64) -> bool {
-        let checker = DoubleClickChecker::default();
-        let is_double = checker.is_double_click(self.last_click_time, self.last_click_pos, x, y);
-        self.last_click_time = std::time::Instant::now();
-        self.last_click_pos = (x, y);
-        is_double
+        self.double_click.click(x, y)
     }
 
     fn handle_motion(&mut self, x: f64, y: f64) -> bool {

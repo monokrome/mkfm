@@ -21,7 +21,7 @@ use crate::input::{Action, Mode, SortMode, handle_key};
 use crate::jobs;
 use crate::navigation::{Browser, Clipboard, Selection};
 
-use crate::split::{SplitDirection, SplitTree};
+use mkui::layout::{SplitDirection, SplitTree};
 
 /// Result of executing a command
 pub enum CommandResult {
@@ -84,8 +84,7 @@ pub struct App {
     // Icon display
     pub icons_enabled: bool,
     // Click tracking
-    pub last_click_time: std::time::Instant,
-    pub last_click_pos: (f64, f64),
+    pub double_click: mkui::event::DoubleClickDetector,
     // Drag state
     pub drag_start_pos: Option<(f64, f64)>,
     pub dragging: bool,
@@ -181,8 +180,7 @@ impl App {
             focus_area: FocusArea::Splits,
             vi_mode,
             icons_enabled,
-            last_click_time: std::time::Instant::now(),
-            last_click_pos: (0.0, 0.0),
+            double_click: mkui::event::DoubleClickDetector::default(),
             drag_start_pos: None,
             dragging: false,
             feature_list: features::FeatureList::new(),

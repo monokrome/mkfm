@@ -14,7 +14,6 @@ mod navigation;
 mod preview;
 mod preview_state;
 mod render;
-mod split;
 
 use app::App;
 use config::Theme;
@@ -106,7 +105,7 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             .enable_all()
             .build()
             .unwrap();
-        rt.block_on(App::new(vec![], split::SplitDirection::Vertical))
+        rt.block_on(App::new(vec![], mkui::layout::SplitDirection::Vertical))
     });
 
     MkuiApp::run_gui("mkfm", 16.0, move |event: &Event, renderer: &mut dyn Renderer| {
