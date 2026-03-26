@@ -58,9 +58,13 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         app_render::render_app(&mut renderer, app, &app.theme, &mut preview, &mut tracker);
         renderer.end_frame()?;
 
-        // Short timeout when playing video, longer when idle
-        let poll_timeout = if app.playback.as_ref().is_some_and(|p| p.playing) {
-            Duration::from_millis(1)
+        // Poll timeout: match video frame duration when playing, idle otherwise
+        let poll_timeout = if let Some(ref playback) = app.playback {
+            if playback.playing {
+                playback.frame_duration
+            } else {
+                Duration::from_millis(100)
+            }
         } else {
             Duration::from_millis(100)
         };
