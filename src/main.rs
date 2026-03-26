@@ -18,7 +18,6 @@ mod preview_state;
 mod render;
 
 use app::App;
-use config::Theme;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (start_paths, split_direction) = cli::parse_args();
@@ -41,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
-    use mkui::event::{EventKind, EventPoller, Key};
+    use mkui::event::EventPoller;
     use mkui::render::Renderer;
     use mkui::tui::TerminalRenderer;
 
@@ -79,7 +78,7 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
 fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     use mkui::app::App as MkuiApp;
-    use mkui::event::{Event, EventKind, Key};
+    use mkui::event::{Event, EventKind};
     use mkui::render::Renderer;
 
     // Take ownership of app for the GUI closure

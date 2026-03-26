@@ -13,7 +13,7 @@ use std::time::SystemTime;
 
 pub use archive::{ArchiveEntry, extract_archive, extract_files_from_archive, list_archive};
 pub use ops::{copy_file, create_symlink, delete, move_file};
-pub use utils::{chmod, format_size, is_archive, trash};
+pub use utils::{chmod, is_archive, trash};
 
 /// Filesystem entry (file or directory)
 #[derive(Clone)]

@@ -1,6 +1,6 @@
 //! Mouse event handling (click, scroll, drag)
 
-use mkui::event::{DoubleClickDetector, MouseEvent};
+use mkui::event::MouseEvent;
 use mkui::layout::Rect;
 
 use super::pointer_helpers::PointerLayout;

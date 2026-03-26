@@ -102,7 +102,7 @@ fn render_media_preview(
     bounds: Rect,
     fg: Color,
 ) {
-    let style = Style::new().fg(fg);
+    let _style = Style::new().fg(fg);
     let dim_style = Style::new().fg(fg).dim(true);
     let mut row = bounds.y;
 

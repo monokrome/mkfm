@@ -324,7 +324,6 @@ impl Dispatch<ZwlrAttachedSurfaceV1, AttachedSurfaceData> for OverlayState {
                     }
                 }
             }
-            _ => {}
         }
     }
 }

@@ -22,7 +22,7 @@ pub fn render_browser_pane(
     y: u16,
     width: u16,
     height: u16,
-    focused: bool,
+    _focused: bool,
     colors: &RenderColors,
     layout: &RenderLayout,
     _icons_enabled: bool,

@@ -7,7 +7,7 @@ use mkui::style::Style;
 use crate::app::{App, FocusArea};
 use crate::config::Theme;
 use crate::jobs::Job;
-use crate::preview::{self, PreviewCache};
+use crate::preview::PreviewCache;
 use crate::preview::render_preview;
 use crate::preview_state::PreviewState;
 use crate::render;
