@@ -316,8 +316,9 @@ fn handle_normal_key_standard(key: &str) -> Action {
         "PageDown" => Action::MoveCursor(10),
 
         // Enter and navigation
-        "\n" | "Right" => Action::EnterDirectory,
-        "Left" | "\u{8}" => Action::ParentDirectory, // Backspace
+        "\n" => Action::OpenFile,
+        "Right" => Action::EnterDirectory,
+        "Left" | "\u{8}" => Action::ParentDirectory,
 
         // File operations
         "Delete" => Action::Trash,
@@ -330,9 +331,12 @@ fn handle_normal_key_standard(key: &str) -> Action {
         "F3" => Action::SearchNext,
         "S-F3" => Action::SearchPrev,
 
+        // Media
+        " " => Action::MediaPlayPause,
+
         // Misc
-        "F5" => Action::ParentDirectory, // Refresh (re-enter current dir)
-        "\u{1b}" => Action::ClearSearchHighlight, // Escape
+        "F5" => Action::ParentDirectory,
+        "\u{1b}" => Action::ClearSearchHighlight,
         "C-h" => Action::ToggleHidden,
         "F2" => Action::OpenFile,
         "F12" => Action::ToggleFeatureList,

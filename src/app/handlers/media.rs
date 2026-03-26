@@ -56,21 +56,26 @@ impl App {
     fn start_media_playback(&mut self, path: &std::path::Path, start_seconds: f64) {
         let path_str = path.to_string_lossy().to_string();
 
-        let mut cmd = Command::new("ffmpeg");
-        cmd.arg("-i").arg(&path_str);
+        // Try available audio outputs in order
+        // Try pulse first, then alsa, then skip if no audio available
+        for (fmt, device) in [("pulse", "default"), ("alsa", "default")] {
+            let mut cmd = Command::new("ffmpeg");
+            cmd.arg("-i").arg(&path_str);
 
-        if start_seconds > 0.0 {
-            cmd.arg("-ss").arg(format!("{}", start_seconds));
-        }
+            if start_seconds > 0.0 {
+                cmd.arg("-ss").arg(format!("{}", start_seconds));
+            }
 
-        cmd.args(["-vn", "-f", "pulse", "default", "-v", "quiet"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            cmd.args(["-vn", "-f", fmt, device, "-v", "quiet"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
 
-        if let Ok(child) = cmd.spawn() {
-            self.media_child = Some(child);
-            self.media_path = Some(path.to_path_buf());
+            if let Ok(child) = cmd.spawn() {
+                self.media_child = Some(child);
+                self.media_path = Some(path.to_path_buf());
+                return;
+            }
         }
     }
 }

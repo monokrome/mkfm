@@ -154,7 +154,7 @@ fn extract_tag(json: &str, tag_name: &str) -> Option<String> {
 fn extract_thumbnail(path: &Path, max_width: u32, max_height: u32) -> (Option<Vec<u8>>, u32, u32) {
     // Use ffmpeg to extract a frame at 1 second (or start if shorter)
     let scale_filter = format!(
-        "scale='min({},iw)':min'({},ih)':force_original_aspect_ratio=decrease",
+        "scale='min({},iw)':'min({},ih)':force_original_aspect_ratio=decrease",
         max_width, max_height
     );
 
