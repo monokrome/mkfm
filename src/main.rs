@@ -52,23 +52,11 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     let events = EventPoller::new()?;
 
-    // Force initial render
-    renderer.begin_frame()?;
-    tracker.invalidate_all();
-    app_render::render_app(&mut renderer, app, &app.theme, &mut preview, &mut tracker);
-    renderer.end_frame()?;
-
     loop {
-        // Render — only sends a frame if something was painted
-        let buf_before = renderer.buffer_len();
+        // Render — tracker decides what actually gets painted
         renderer.begin_frame()?;
         app_render::render_app(&mut renderer, app, &app.theme, &mut preview, &mut tracker);
-        if renderer.buffer_len() > buf_before + 20 {
-            // Something was rendered beyond just cursor control codes
-            renderer.end_frame()?;
-        } else {
-            renderer.discard_frame();
-        }
+        renderer.end_frame()?;
 
         // Short timeout when playing video, longer when idle
         let poll_timeout = if app.playback.as_ref().is_some_and(|p| p.playing) {
