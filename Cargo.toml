@@ -17,6 +17,7 @@ wayland-scanner = "0.31"
 
 # Window access (for Wayland handle detection)
 winit = "0.30"
+rwh_06 = { package = "raw-window-handle", version = "0.6" }
 
 # Image loading and EXIF
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }

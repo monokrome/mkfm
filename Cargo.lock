@@ -1641,6 +1641,7 @@ dependencies = [
  "mime_guess",
  "mkui",
  "prefer",
+ "raw-window-handle",
  "resvg",
  "tokio",
  "toml",
