@@ -106,15 +106,18 @@ fn render_media_preview(
     let dim_style = Style::new().fg(fg).dim(true);
     let mut row = bounds.y;
 
-    // Thumbnail
+    // Thumbnail — give it most of the preview space, leave a few rows for metadata
     if let Some(data) = thumbnail {
-        if thumb_width > 0 && thumb_height > 0 {
-            let thumb_rows = bounds.height / 2;
+        // Validate data matches declared dimensions (RGBA = 4 bytes/pixel)
+        let expected_size = (thumb_width * thumb_height * 4) as usize;
+        if thumb_width > 0 && thumb_height > 0 && data.len() >= expected_size {
+            let metadata_rows = 6u16;
+            let thumb_rows = bounds.height.saturating_sub(metadata_rows);
             let thumb_bounds = Rect::new(bounds.x, row, bounds.width, thumb_rows);
-            let dst = ObjectFit::Contain.fit(thumb_width, thumb_height, thumb_bounds);
+            let dst = ObjectFit::Contain.fit_with_aspect(thumb_width, thumb_height, thumb_bounds, renderer.cell_aspect());
 
             let _ = renderer.render_image_rgba(&ImageParams {
-                data,
+                data: &data[..expected_size],
                 width: thumb_width,
                 height: thumb_height,
                 col: dst.x,
