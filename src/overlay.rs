@@ -7,9 +7,10 @@ use std::ptr::NonNull;
 
 use wayland_client::{
     Connection, Dispatch, EventQueue, Proxy,
-    globals::{registry_queue_init, Global, GlobalListContents},
+    globals::registry_queue_init,
     protocol::{wl_compositor::WlCompositor, wl_registry, wl_surface::WlSurface},
 };
+use wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel;
 
 use crate::attached_surface::{
     protocol::zwlr_attached_surface_manager_v1::ZwlrAttachedSurfaceManagerV1,
@@ -81,7 +82,7 @@ impl OverlayManager {
     }
 
     /// Create an attached surface for the given toplevel.
-    /// `toplevel_ptr` should come from `WindowExtWayland::xdg_toplevel()`.
+    /// `toplevel_ptr` comes from `WindowExtWayland::xdg_toplevel()`.
     pub fn create_surface(
         &mut self,
         toplevel_ptr: NonNull<std::ffi::c_void>,
@@ -93,39 +94,40 @@ impl OverlayManager {
     ) -> Option<AttachedSurfaceId> {
         let manager = self.state.manager.as_ref()?;
         let compositor = self.state.compositor.as_ref()?;
-
         let qh = self.event_queue.handle();
 
-        // Create a new wl_surface
+        // Create a new wl_surface for the overlay
         let surface = compositor.create_surface(&qh, ());
 
-        // Get xdg_toplevel from raw pointer
+        // Reconstruct the xdg_toplevel from winit's raw pointer.
+        // Both connections share the same wl_display, so object IDs are valid.
         let toplevel_id = unsafe {
             wayland_backend::client::ObjectId::from_ptr(
-                ZwlrAttachedSurfaceManagerV1::interface(),
+                XdgToplevel::interface(),
                 toplevel_ptr.as_ptr().cast(),
             )
-        };
+        }.ok()?;
+        let toplevel = XdgToplevel::from_id(&self.connection, toplevel_id).ok()?;
 
-        // This is tricky — we need the xdg_toplevel as a protocol object.
-        // For now, use the raw manager request directly.
         let id = AttachedSurfaceId(self.state.next_id);
         self.state.next_id += 1;
 
+        let proto_anchor = match anchor {
+            Anchor::None => crate::attached_surface::protocol::zwlr_attached_surface_v1::Anchor::None,
+            Anchor::Top => crate::attached_surface::protocol::zwlr_attached_surface_v1::Anchor::Top,
+            Anchor::Bottom => crate::attached_surface::protocol::zwlr_attached_surface_v1::Anchor::Bottom,
+            Anchor::Left => crate::attached_surface::protocol::zwlr_attached_surface_v1::Anchor::Left,
+            Anchor::Right => crate::attached_surface::protocol::zwlr_attached_surface_v1::Anchor::Right,
+        };
+
         let attached = manager.inner().get_attached_surface(
             &surface,
-            // We need the xdg_toplevel as a proper wayland object here
-            // This requires more protocol wiring — placeholder for now
-            todo!("xdg_toplevel from raw pointer"),
+            &toplevel,
             &qh,
             AttachedSurfaceData { id },
         );
 
-        attached.set_anchor(
-            crate::attached_surface::protocol::zwlr_attached_surface_v1::Anchor::Right,
-            margin,
-            offset,
-        );
+        attached.set_anchor(proto_anchor, margin, offset);
         attached.set_size(width, height);
         surface.commit();
 
@@ -145,6 +147,24 @@ impl OverlayManager {
         Some(id)
     }
 
+    /// Destroy the current overlay surface
+    pub fn destroy_surface(&mut self) {
+        if let Some(surface) = self.state.surface.take() {
+            surface.attached.destroy();
+            surface.surface.destroy();
+        }
+    }
+
+    /// Get the current overlay surface if it exists and is configured
+    pub fn surface(&self) -> Option<&AttachedSurface> {
+        self.state.surface.as_ref().filter(|s| s.configured)
+    }
+
+    /// Get mutable access to the overlay surface
+    pub fn surface_mut(&mut self) -> Option<&mut AttachedSurface> {
+        self.state.surface.as_mut().filter(|s| s.configured)
+    }
+
     /// Dispatch pending Wayland events
     pub fn dispatch(&mut self) {
         let _ = self.event_queue.dispatch_pending(&mut self.state);
@@ -153,12 +173,12 @@ impl OverlayManager {
 
 // Wayland dispatch implementations
 
-impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for OverlayState {
+impl Dispatch<wl_registry::WlRegistry, wayland_client::globals::GlobalListContents> for OverlayState {
     fn event(
         _state: &mut Self,
         _proxy: &wl_registry::WlRegistry,
         _event: wl_registry::Event,
-        _data: &GlobalListContents,
+        _data: &wayland_client::globals::GlobalListContents,
         _conn: &Connection,
         _qh: &wayland_client::QueueHandle<Self>,
     ) {
@@ -231,5 +251,19 @@ impl Dispatch<ZwlrAttachedSurfaceV1, AttachedSurfaceData> for OverlayState {
             }
             _ => {}
         }
+    }
+}
+
+// XdgToplevel dispatch — needed since we reconstruct it from a foreign pointer
+impl Dispatch<XdgToplevel, ()> for OverlayState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &XdgToplevel,
+        _event: <XdgToplevel as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qh: &wayland_client::QueueHandle<Self>,
+    ) {
+        // Events handled by winit, not us
     }
 }
