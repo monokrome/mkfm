@@ -118,6 +118,8 @@ pub fn render_app(
 
                 if let Some(ref playback) = app.playback {
                     if !playback.current_frame.is_empty() {
+                        // Clear preview area before rendering video frame
+                        let _ = renderer.fill_rect(prev_rect, colors.bg);
                         let dst = mkui::layout::ObjectFit::Contain.fit_with_aspect(
                             playback.width,
                             playback.height,

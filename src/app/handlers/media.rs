@@ -11,7 +11,12 @@ pub struct VideoPlayback {
     pub video_child: Child,
     pub video_stdout: std::process::ChildStdout,
     pub audio_child: Option<Child>,
-    pub frame_buf: Vec<u8>,
+    /// Accumulation buffer for partial reads
+    read_buf: Vec<u8>,
+    /// Bytes read so far into the current frame
+    read_pos: usize,
+    /// Size of one frame in bytes
+    frame_size: usize,
     pub width: u32,
     pub height: u32,
     pub frame_duration: std::time::Duration,
@@ -21,8 +26,7 @@ pub struct VideoPlayback {
 }
 
 impl VideoPlayback {
-    /// Advance to the latest available frame, skipping intermediate frames
-    /// to stay synchronized with wall-clock time. Non-blocking.
+    /// Advance to the latest available frame. Fully non-blocking.
     pub fn advance(&mut self) -> bool {
         if !self.playing {
             return false;
@@ -31,8 +35,8 @@ impl VideoPlayback {
         let fd = self.video_stdout.as_raw_fd();
         let mut got_frame = false;
 
-        // Read and skip frames until we're caught up or no more data available
         loop {
+            // Check if data is available without blocking
             let mut pfd = libc::pollfd {
                 fd,
                 events: libc::POLLIN,
@@ -43,18 +47,33 @@ impl VideoPlayback {
                 break;
             }
 
-            match self.video_stdout.read_exact(&mut self.frame_buf) {
-                Ok(()) => {
-                    // Keep this frame — overwrite previous if we're skipping
-                    self.current_frame.clear();
-                    self.current_frame.extend_from_slice(&self.frame_buf);
-                    got_frame = true;
+            // Read whatever is available (non-blocking partial read)
+            let remaining = self.frame_size - self.read_pos;
+            let buf = &mut self.read_buf[self.read_pos..self.read_pos + remaining];
+            match self.video_stdout.read(buf) {
+                Ok(0) => {
+                    // EOF — video ended
+                    self.playing = false;
+                    break;
+                }
+                Ok(n) => {
+                    self.read_pos += n;
 
-                    // If we're caught up to real time, stop skipping
-                    if self.last_frame.elapsed() < self.frame_duration * 2 {
-                        break;
+                    // Complete frame?
+                    if self.read_pos >= self.frame_size {
+                        self.current_frame.clear();
+                        self.current_frame.extend_from_slice(&self.read_buf[..self.frame_size]);
+                        self.read_pos = 0;
+                        got_frame = true;
+
+                        // If caught up to real time, stop and render this frame
+                        if self.last_frame.elapsed() < self.frame_duration * 2 {
+                            break;
+                        }
+                        // Otherwise keep reading to skip ahead
                     }
                 }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
                 Err(_) => {
                     self.playing = false;
                     break;
@@ -83,9 +102,8 @@ impl Drop for VideoPlayback {
 
 impl App {
     pub fn execute_media_play_pause(&mut self) -> bool {
-        // If already playing, toggle pause/stop
         if self.playback.is_some() {
-            self.playback.take(); // Drop kills processes
+            self.playback.take();
             return true;
         }
 
@@ -112,7 +130,7 @@ impl App {
         };
 
         self.media_position = (self.media_position + seconds as f64).max(0.0);
-        self.playback.take(); // kill current
+        self.playback.take();
         self.start_playback(&path, self.media_position);
         true
     }
@@ -129,7 +147,6 @@ impl App {
     fn start_playback(&mut self, path: &std::path::Path, start_seconds: f64) {
         let path_str = path.to_string_lossy().to_string();
 
-        // Get video dimensions and fps
         let (width, height, fps) = match get_video_info(path) {
             Some(info) => info,
             None => return,
@@ -137,7 +154,6 @@ impl App {
 
         let frame_size = (width * height * 3) as usize;
 
-        // Start video frame pipe
         let mut video_cmd = Command::new("ffmpeg");
         video_cmd.arg("-i").arg(&path_str);
         if start_seconds > 0.0 {
@@ -159,14 +175,15 @@ impl App {
             None => return,
         };
 
-        // Start audio in background (best effort)
         let audio_child = start_audio(&path_str, start_seconds);
 
         self.playback = Some(VideoPlayback {
             video_child,
             video_stdout,
             audio_child,
-            frame_buf: vec![0u8; frame_size],
+            read_buf: vec![0u8; frame_size],
+            read_pos: 0,
+            frame_size,
             width,
             height,
             frame_duration: std::time::Duration::from_secs_f64(1.0 / fps),
@@ -217,6 +234,7 @@ fn get_video_info(path: &std::path::Path) -> Option<(u32, u32, f64)> {
 }
 
 fn start_audio(path_str: &str, start_seconds: f64) -> Option<Child> {
+    // Try pulse first, then alsa, then skip if no audio available
     for (fmt, device) in [("pulse", "default"), ("alsa", "default")] {
         let mut cmd = Command::new("ffmpeg");
         cmd.arg("-i").arg(path_str);
