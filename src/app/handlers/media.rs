@@ -21,41 +21,52 @@ pub struct VideoPlayback {
 }
 
 impl VideoPlayback {
-    /// Read next frame if due. Returns true if a new frame is ready.
-    /// Non-blocking — returns false immediately if no data available.
+    /// Advance to the latest available frame, skipping intermediate frames
+    /// to stay synchronized with wall-clock time. Non-blocking.
     pub fn advance(&mut self) -> bool {
         if !self.playing {
             return false;
         }
 
-        if self.last_frame.elapsed() < self.frame_duration {
-            return false;
-        }
-
-        // Non-blocking read — check if data is available first
         let fd = self.video_stdout.as_raw_fd();
-        let mut pfd = libc::pollfd {
-            fd,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        let ready = unsafe { libc::poll(&mut pfd, 1, 0) };
-        if ready <= 0 {
-            return false;
+        let mut got_frame = false;
+
+        // Read and skip frames until we're caught up or no more data available
+        loop {
+            let mut pfd = libc::pollfd {
+                fd,
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            let ready = unsafe { libc::poll(&mut pfd, 1, 0) };
+            if ready <= 0 {
+                break;
+            }
+
+            match self.video_stdout.read_exact(&mut self.frame_buf) {
+                Ok(()) => {
+                    // Keep this frame — overwrite previous if we're skipping
+                    self.current_frame.clear();
+                    self.current_frame.extend_from_slice(&self.frame_buf);
+                    got_frame = true;
+
+                    // If we're caught up to real time, stop skipping
+                    if self.last_frame.elapsed() < self.frame_duration * 2 {
+                        break;
+                    }
+                }
+                Err(_) => {
+                    self.playing = false;
+                    break;
+                }
+            }
         }
 
-        match self.video_stdout.read_exact(&mut self.frame_buf) {
-            Ok(()) => {
-                self.current_frame.clear();
-                self.current_frame.extend_from_slice(&self.frame_buf);
-                self.last_frame = std::time::Instant::now();
-                true
-            }
-            Err(_) => {
-                self.playing = false;
-                false
-            }
+        if got_frame {
+            self.last_frame = std::time::Instant::now();
         }
+
+        got_frame
     }
 }
 
