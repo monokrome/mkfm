@@ -7,7 +7,7 @@ mod bulk_rename;
 mod commands;
 mod execute;
 mod features_init;
-mod handlers;
+pub mod handlers;
 mod pointer;
 mod pointer_helpers;
 
@@ -92,7 +92,7 @@ pub struct App {
     pub feature_list: features::FeatureList,
     pub feature_pane: features::FeatureListPane,
     // Media playback
-    pub media_child: Option<std::process::Child>,
+    pub playback: Option<crate::app::handlers::media::VideoPlayback>,
     pub media_path: Option<PathBuf>,
     pub media_position: f64,
     // Preview sizing
@@ -191,7 +191,7 @@ impl App {
             dragging: false,
             feature_list: features::FeatureList::new(),
             feature_pane: features::FeatureListPane::new(),
-            media_child: None,
+            playback: None,
             media_path: None,
             media_position: 0.0,
             preview_width_ratio: 0.4,

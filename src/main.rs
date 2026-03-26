@@ -55,15 +55,23 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         // Render if needed
         if dirty {
-            renderer.begin_frame()?;
-            renderer.clear()?;
+            let playing = app.playback.as_ref().is_some_and(|p| p.playing);
+            renderer.hide_cursor()?;
+            if !playing {
+                renderer.clear()?;
+            }
             app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
-            renderer.end_frame()?;
+            renderer.flush()?;
             dirty = false;
         }
 
-        // Poll with timeout — allows async updates to trigger redraws
-        let event = events.poll(Duration::from_millis(100))?;
+        // Short timeout when playing video, longer when idle
+        let poll_timeout = if app.playback.as_ref().is_some_and(|p| p.playing) {
+            Duration::from_millis(1)
+        } else {
+            Duration::from_millis(100)
+        };
+        let event = events.poll(poll_timeout)?;
 
         if let Some(event) = event {
             dirty |= process_event(app, &event, &mut renderer)?;
@@ -79,6 +87,16 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         dirty |= event_loop::poll_job_updates(app);
+
+        // Advance video playback if active
+        if let Some(ref mut playback) = app.playback {
+            if playback.advance() {
+                dirty = true;
+            }
+            if playback.playing {
+                dirty = true; // keep rendering while playing
+            }
+        }
     }
 
     Ok(())

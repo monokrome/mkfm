@@ -97,13 +97,34 @@ pub fn render_app(
 
             // Render inline preview if space available
             if let Some(prev_rect) = preview_rect {
-                render_inline_preview(
-                    renderer,
-                    browser,
-                    &mut preview.cache,
-                    prev_rect,
-                    &colors,
-                );
+                // If video is playing, render the current frame
+                if let Some(ref playback) = app.playback {
+                    if !playback.current_frame.is_empty() {
+                        let dst = mkui::layout::ObjectFit::Contain.fit_with_aspect(
+                            playback.width,
+                            playback.height,
+                            prev_rect,
+                            renderer.cell_aspect(),
+                        );
+                        let _ = renderer.render_image(&mkui::render::ImageParams {
+                            data: &playback.current_frame,
+                            width: playback.width,
+                            height: playback.height,
+                            col: dst.x,
+                            row: dst.y,
+                            width_cells: Some(dst.width),
+                            height_cells: Some(dst.height),
+                        });
+                    }
+                } else {
+                    render_inline_preview(
+                        renderer,
+                        browser,
+                        &mut preview.cache,
+                        prev_rect,
+                        &colors,
+                    );
+                }
             }
         });
 
