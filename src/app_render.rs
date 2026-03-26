@@ -9,6 +9,7 @@ use crate::config::Theme;
 use crate::jobs::Job;
 use crate::preview::{self, PreviewCache};
 use crate::preview::render_preview;
+use crate::preview_state::PreviewState;
 use crate::render;
 
 /// Minimum pane width to show inline preview
@@ -22,7 +23,7 @@ pub fn render_app(
     renderer: &mut dyn Renderer,
     app: &App,
     theme: &Theme,
-    preview_cache: &mut PreviewCache,
+    preview: &mut PreviewState,
 ) {
     let (width, height) = renderer.dimensions();
     let colors = render::RenderColors::from_theme(theme);
@@ -42,6 +43,7 @@ pub fn render_app(
             // Determine if we should show inline preview
             let show_preview = focused
                 && app.overlay_enabled
+                && !preview.is_overlay_active()
                 && pane_rect.width >= PREVIEW_MIN_WIDTH;
 
             let (list_rect, preview_rect) = if show_preview {
@@ -82,7 +84,7 @@ pub fn render_app(
                 render_inline_preview(
                     renderer,
                     browser,
-                    preview_cache,
+                    &mut preview.cache,
                     prev_rect,
                     &colors,
                 );

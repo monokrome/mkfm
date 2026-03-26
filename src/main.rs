@@ -47,7 +47,7 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut renderer = TerminalRenderer::new()?;
     renderer.enter_alt_screen()?;
-    let mut preview_cache = preview::PreviewCache::new();
+    let mut preview = preview_state::PreviewState::new();
 
     let events = EventPoller::new()?;
 
@@ -55,7 +55,7 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         // Render
         renderer.begin_frame()?;
         renderer.clear()?;
-        app_render::render_app(&mut renderer, app, &app.theme, &mut preview_cache);
+        app_render::render_app(&mut renderer, app, &app.theme, &mut preview);
         renderer.end_frame()?;
 
         // Poll jobs
@@ -111,9 +111,15 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         rt.block_on(App::new(vec![], mkui::layout::SplitDirection::Vertical))
     });
 
-    let mut preview_cache = preview::PreviewCache::new();
+    let mut preview = preview_state::PreviewState::new();
+    let mut overlay_initialized = false;
 
     MkuiApp::run_gui("mkfm", 16.0, move |event: &Event, renderer: &mut dyn Renderer| {
+        // Initialize overlay on first frame
+        if !overlay_initialized {
+            preview.init_overlay(renderer);
+            overlay_initialized = true;
+        }
         if let Some(key) = event.kind.pressed_key() {
             if let Some(key_str) = key_to_string(key, event) {
                 app.process_key(&key_str);
@@ -137,9 +143,16 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         if matches!(event.kind, EventKind::Redraw) {
             event_loop::poll_job_updates(&mut app);
 
+            // Update overlay with current file
+            let current_file = app.browser().and_then(|b| {
+                b.entries.get(b.cursor).map(|e| b.path.join(&e.name))
+            });
+            preview.update_overlay(renderer, current_file.as_deref(), app.overlay_enabled);
+            preview.render_overlay();
+
             let _ = renderer.begin_frame();
             let _ = renderer.clear();
-            app_render::render_app(renderer, &app, &app.theme, &mut preview_cache);
+            app_render::render_app(renderer, &app, &app.theme, &mut preview);
             let _ = renderer.end_frame();
         }
 

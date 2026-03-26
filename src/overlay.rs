@@ -3,12 +3,17 @@
 //! Creates and manages attached surfaces for preview rendering on
 //! Wayland compositors that support the wlr-attached-surface protocol.
 
+use std::os::fd::FromRawFd;
+use std::os::unix::io::AsFd;
 use std::ptr::NonNull;
 
 use wayland_client::{
     Connection, Dispatch, EventQueue, Proxy,
     globals::registry_queue_init,
-    protocol::{wl_compositor::WlCompositor, wl_registry, wl_surface::WlSurface},
+    protocol::{
+        wl_buffer::WlBuffer, wl_compositor::WlCompositor, wl_registry,
+        wl_shm::WlShm, wl_shm_pool::WlShmPool, wl_surface::WlSurface,
+    },
 };
 use wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel;
 
@@ -27,6 +32,7 @@ pub struct OverlayManager {
 
 struct OverlayState {
     compositor: Option<WlCompositor>,
+    shm: Option<WlShm>,
     manager: Option<AttachedSurfaceManager>,
     surface: Option<AttachedSurface>,
     next_id: u64,
@@ -58,6 +64,10 @@ impl OverlayManager {
             .bind(&event_queue.handle(), 4..=6, ())
             .ok()?;
 
+        let shm: Option<WlShm> = globals
+            .bind(&event_queue.handle(), 1..=1, ())
+            .ok();
+
         let manager: Option<ZwlrAttachedSurfaceManagerV1> = globals
             .bind(&event_queue.handle(), 1..=1, ())
             .ok();
@@ -69,6 +79,7 @@ impl OverlayManager {
             event_queue,
             state: OverlayState {
                 compositor: Some(compositor),
+                shm,
                 manager: attached_manager,
                 surface: None,
                 next_id: 0,
@@ -165,6 +176,70 @@ impl OverlayManager {
         self.state.surface.as_mut().filter(|s| s.configured)
     }
 
+    /// Submit a pixel buffer to the overlay surface via shared memory
+    pub fn submit_buffer(&mut self, data: &[u8], width: u32, height: u32) {
+        let Some(ref shm) = self.state.shm else { return };
+        let Some(ref surface_state) = self.state.surface else { return };
+
+        let stride = width * 4;
+        let size = (stride * height) as usize;
+
+        // Create memfd
+        let name = std::ffi::CString::new("mkfm-preview").unwrap();
+        let fd = unsafe { libc::memfd_create(name.as_ptr(), libc::MFD_CLOEXEC) };
+        if fd < 0 {
+            return;
+        }
+
+        if unsafe { libc::ftruncate(fd, size as libc::off_t) } < 0 {
+            unsafe { libc::close(fd); }
+            return;
+        }
+
+        // Map and write pixel data
+        let ptr = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED,
+                fd,
+                0,
+            )
+        };
+
+        if ptr == libc::MAP_FAILED {
+            unsafe { libc::close(fd); }
+            return;
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.cast(), size);
+            libc::munmap(ptr, size);
+        }
+
+        // Create wl_shm_pool and wl_buffer
+        let fd_owned = unsafe { std::os::fd::OwnedFd::from_raw_fd(fd) };
+        let qh = self.event_queue.handle();
+        let pool = shm.create_pool(fd_owned.as_fd(), size as i32, &qh, ());
+        let buffer = pool.create_buffer(
+            0,
+            width as i32,
+            height as i32,
+            stride as i32,
+            wayland_client::protocol::wl_shm::Format::Argb8888,
+            &qh,
+            (),
+        );
+
+        surface_state.surface.attach(Some(&buffer), 0, 0);
+        surface_state.surface.damage_buffer(0, 0, width as i32, height as i32);
+        surface_state.surface.commit();
+
+        // Clean up pool (buffer stays valid until compositor releases it)
+        pool.destroy();
+    }
+
     /// Dispatch pending Wayland events
     pub fn dispatch(&mut self) {
         let _ = self.event_queue.dispatch_pending(&mut self.state);
@@ -251,6 +326,42 @@ impl Dispatch<ZwlrAttachedSurfaceV1, AttachedSurfaceData> for OverlayState {
             }
             _ => {}
         }
+    }
+}
+
+impl Dispatch<WlShm, ()> for OverlayState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WlShm,
+        _event: <WlShm as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qh: &wayland_client::QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<WlShmPool, ()> for OverlayState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WlShmPool,
+        _event: <WlShmPool as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qh: &wayland_client::QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<WlBuffer, ()> for OverlayState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WlBuffer,
+        _event: <WlBuffer as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qh: &wayland_client::QueueHandle<Self>,
+    ) {
     }
 }
 
