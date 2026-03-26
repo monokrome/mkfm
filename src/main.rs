@@ -80,6 +80,16 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
         event_loop::poll_job_updates(app);
 
+        // Stop playback if cursor moved to a different file
+        if app.playback.is_some() {
+            let current_file = app.browser().and_then(|b| {
+                b.entries.get(b.cursor).map(|e| b.path.join(&e.name))
+            });
+            if current_file.as_deref() != app.media_path.as_deref() {
+                app.playback.take();
+            }
+        }
+
         if let Some(ref mut playback) = app.playback {
             playback.advance();
         }
