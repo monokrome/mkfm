@@ -120,10 +120,6 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let mut overlay_initialized = false;
 
     MkuiApp::run_gui("mkfm", 16.0, move |event: &Event, renderer: &mut dyn Renderer| {
-        if !overlay_initialized {
-            preview.init_overlay(renderer);
-            overlay_initialized = true;
-        }
 
         if let Some(key) = event.kind.pressed_key() {
             if let Some(key_str) = key_to_string(key, event) {
@@ -146,6 +142,15 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if matches!(event.kind, EventKind::Redraw) {
+            // Initialize overlay after the first frame so the compositor
+            // has a committed surface with a scene tree
+            if !overlay_initialized {
+                let _ = renderer.begin_frame();
+                let _ = renderer.end_frame();
+                preview.init_overlay(renderer);
+                overlay_initialized = true;
+            }
+
             event_loop::poll_job_updates(&mut app);
 
             let current_file = app.browser().and_then(|b| {

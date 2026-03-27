@@ -93,9 +93,8 @@ pub fn render_app(
                 (pane_rect, None)
             };
 
+            // Track the full pane — not just the list portion
             if tracker.needs_render(renderer, pane_id, browser_gen, pane_rect) {
-                // Clear the full pane first so toggling preview doesn't leave stale content
-                let _ = renderer.fill_rect(pane_rect, colors.bg);
                 render::render_browser_pane(
                     renderer,
                     browser,
