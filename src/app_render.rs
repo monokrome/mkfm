@@ -72,8 +72,7 @@ pub fn render_app(
             app.preview_zoom.to_bits().hash(&mut hasher);
             let browser_gen = hasher.finish();
 
-            let show_preview = app.overlay_enabled
-                && !preview.is_overlay_active()
+            let show_preview = !preview.is_overlay_active()
                 && pane_rect.width >= PREVIEW_MIN_WIDTH;
 
             let (list_rect, preview_rect) = if show_preview {
