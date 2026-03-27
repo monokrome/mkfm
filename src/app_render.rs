@@ -73,11 +73,15 @@ pub fn render_app(
             app.preview_enabled.hash(&mut hasher);
             let browser_gen = hasher.finish();
 
-            let show_preview = app.preview_enabled
-                && !preview.is_overlay_active()
+            let has_video = focused && app.playback.as_ref().is_some_and(|p| !p.current_frame.is_empty());
+            // Video always renders inline (can't stream to overlay yet).
+            // Static previews use inline when overlay isn't active.
+            let show_inline_preview = app.preview_enabled
+                && (has_video || !preview.is_overlay_active())
+                && preview.mode != crate::preview_state::PreviewMode::Pending
                 && pane_rect.width >= PREVIEW_MIN_WIDTH;
 
-            let (list_rect, preview_rect) = if show_preview {
+            let (list_rect, preview_rect) = if show_inline_preview {
                 let list_w = calculate_list_width(browser, pane_rect.width);
                 let preview_w = pane_rect.width.saturating_sub(list_w);
                 (
@@ -259,8 +263,11 @@ fn calculate_list_width(browser: &crate::navigation::Browser, pane_width: u16) -
         .max()
         .unwrap_or(10) as u16;
 
-    let needed = max_name_len + 3;
-    let max_list = (pane_width as f32 * MAX_LIST_RATIO) as u16;
+    // List gets enough space for filenames + padding, but at least MIN_LIST_WIDTH.
+    // Preview only gets space if there's room after filenames are satisfied.
+    let needed = max_name_len + 4; // icon + space + name + padding
+    let min_preview = PREVIEW_MIN_WIDTH / 2;
+    let max_list = pane_width.saturating_sub(min_preview);
     needed.max(MIN_LIST_WIDTH).min(max_list)
 }
 

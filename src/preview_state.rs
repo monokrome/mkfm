@@ -13,6 +13,8 @@ use crate::preview::PreviewCache;
 /// Preview rendering mode
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PreviewMode {
+    /// Not yet determined — waiting for init_overlay to detect capabilities
+    Pending,
     /// Render inline within the browser pane
     Inline,
     /// Render in a Wayland attached surface overlay
@@ -32,7 +34,7 @@ impl PreviewState {
     pub fn new() -> Self {
         PreviewState {
             cache: PreviewCache::new(),
-            mode: PreviewMode::Inline,
+            mode: PreviewMode::Pending,
             overlay: None,
             current_path: None,
             needs_render: false,
@@ -45,6 +47,8 @@ impl PreviewState {
         use mkui::gui::WgpuRenderer;
 
         let Some(gpu) = renderer.as_any().downcast_ref::<WgpuRenderer>() else {
+            // Not a GUI renderer — use inline
+            self.mode = PreviewMode::Inline;
             return;
         };
 
@@ -52,7 +56,11 @@ impl PreviewState {
         if let Some(ref overlay) = overlay {
             if overlay.has_attached_surface() {
                 self.mode = PreviewMode::Overlay;
+            } else {
+                self.mode = PreviewMode::Inline;
             }
+        } else {
+            self.mode = PreviewMode::Inline;
         }
         self.overlay = overlay;
     }

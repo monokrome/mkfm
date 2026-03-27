@@ -48,6 +48,7 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let mut renderer = TerminalRenderer::new()?;
     renderer.enter_alt_screen()?;
     let mut preview = preview_state::PreviewState::new();
+    preview.mode = preview_state::PreviewMode::Inline;
     let mut tracker = mkui::component_state::RenderTracker::new();
 
     let events = EventPoller::new()?;
