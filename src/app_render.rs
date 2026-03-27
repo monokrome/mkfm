@@ -72,8 +72,7 @@ pub fn render_app(
             app.preview_zoom.to_bits().hash(&mut hasher);
             let browser_gen = hasher.finish();
 
-            let show_preview = focused
-                && app.overlay_enabled
+            let show_preview = app.overlay_enabled
                 && !preview.is_overlay_active()
                 && pane_rect.width >= PREVIEW_MIN_WIDTH;
 
@@ -118,7 +117,7 @@ pub fn render_app(
                 let preview_id = pane_id + 500;
 
                 if let Some(ref playback) = app.playback {
-                    if !playback.current_frame.is_empty() {
+                    if focused && !playback.current_frame.is_empty() {
                         let _ = renderer.fill_rect(prev_rect, colors.bg);
                         // Apply zoom: scale content dimensions up, ObjectFit clips to bounds
                         let zoomed_w = (playback.width as f32 * app.preview_zoom) as u32;
