@@ -57,7 +57,7 @@ pub struct App {
     pub selection: Selection,
     pub command_buffer: String,
     pub pending_keys: String,
-    pub overlay_enabled: bool,
+    pub preview_enabled: bool,
     pub motion_count: Option<usize>,
     pub pending_theme: Option<Option<String>>,
     pub should_exit: bool,
@@ -117,7 +117,7 @@ impl App {
 
         let show_hidden = config.show_hidden().await;
         let show_parent_entry = config.show_parent_entry().await;
-        let overlay_enabled = config.overlay().await.enabled;
+        let preview_enabled = config.overlay().await.enabled;
         let vi_mode = config.vi_mode().await;
         let search_narrowing = config.search_narrowing().await;
         let icons_mode = config.icons().await;
@@ -170,7 +170,7 @@ impl App {
             selection: Selection::new(),
             command_buffer: String::new(),
             pending_keys: String::new(),
-            overlay_enabled,
+            preview_enabled,
             motion_count: None,
             pending_theme: None,
             should_exit: false,
@@ -215,7 +215,7 @@ impl App {
         SavedSettings {
             show_hidden,
             show_parent_entry,
-            overlay_enabled: Some(self.overlay_enabled),
+            preview_enabled: Some(self.preview_enabled),
             theme: self.theme_name.clone(),
             vi: Some(self.vi_mode),
         }

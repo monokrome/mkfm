@@ -108,8 +108,8 @@ fn print_help() -> ! {
     eprintln!("Settings (:set command):");
     eprintln!("  :set hidden       Show hidden files");
     eprintln!("  :set nohidden     Hide hidden files");
-    eprintln!("  :set overlay      Enable preview overlay");
-    eprintln!("  :set nooverlay    Disable preview overlay");
+    eprintln!("  :set preview      Enable inline preview");
+    eprintln!("  :set nopreview    Disable inline preview");
     eprintln!("  :set parent       Show parent directory entry (..)");
     eprintln!("  :set noparent     Hide parent directory entry");
     eprintln!("  :set theme=NAME   Change theme (e.g., :set theme=dracula)");

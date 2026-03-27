@@ -8,7 +8,7 @@ use toml::map::Map;
 pub struct SavedSettings {
     pub show_hidden: Option<bool>,
     pub show_parent_entry: Option<bool>,
-    pub overlay_enabled: Option<bool>,
+    pub preview_enabled: Option<bool>,
     pub theme: Option<String>,
     pub vi: Option<bool>,
 }
@@ -56,8 +56,8 @@ impl SavedSettings {
         if let Some(v) = self.show_parent_entry {
             table.insert("show_parent_entry".to_string(), toml::Value::Boolean(v));
         }
-        if let Some(v) = self.overlay_enabled {
-            self.set_overlay_enabled(table, v);
+        if let Some(v) = self.preview_enabled {
+            self.set_preview_enabled(table, v);
         }
         if let Some(ref v) = self.theme {
             if v.is_empty() {
@@ -71,7 +71,7 @@ impl SavedSettings {
         }
     }
 
-    fn set_overlay_enabled(&self, table: &mut Map<String, toml::Value>, enabled: bool) {
+    fn set_preview_enabled(&self, table: &mut Map<String, toml::Value>, enabled: bool) {
         let overlay = table
             .entry("overlay".to_string())
             .or_insert_with(|| toml::Value::Table(Map::new()));
@@ -90,7 +90,7 @@ mod tests {
         let settings = SavedSettings::default();
         assert!(settings.show_hidden.is_none());
         assert!(settings.show_parent_entry.is_none());
-        assert!(settings.overlay_enabled.is_none());
+        assert!(settings.preview_enabled.is_none());
         assert!(settings.theme.is_none());
     }
 }

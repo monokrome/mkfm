@@ -28,18 +28,18 @@ impl App {
         true
     }
 
-    pub fn execute_toggle_overlay(&mut self) -> bool {
-        self.overlay_enabled = !self.overlay_enabled;
+    pub fn execute_toggle_preview(&mut self) -> bool {
+        self.preview_enabled = !self.preview_enabled;
         true
     }
 
-    pub fn execute_enable_overlay(&mut self) -> bool {
-        self.overlay_enabled = true;
+    pub fn execute_enable_preview(&mut self) -> bool {
+        self.preview_enabled = true;
         true
     }
 
-    pub fn execute_disable_overlay(&mut self) -> bool {
-        self.overlay_enabled = false;
+    pub fn execute_disable_preview(&mut self) -> bool {
+        self.preview_enabled = false;
         true
     }
 }

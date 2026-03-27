@@ -53,7 +53,7 @@ impl App {
     fn init_preview_feature(&mut self) {
         self.feature_list.add(Feature::available(
             features::FEATURE_PREVIEW,
-            "Preview images and text files in overlay",
+            "Preview images and text files inline",
         ));
     }
 

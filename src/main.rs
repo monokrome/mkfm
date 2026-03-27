@@ -151,7 +151,7 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             let current_file = app.browser().and_then(|b| {
                 b.entries.get(b.cursor).map(|e| b.path.join(&e.name))
             });
-            preview.update_overlay(renderer, current_file.as_deref(), app.overlay_enabled);
+            preview.update_overlay(renderer, current_file.as_deref(), app.preview_enabled);
             preview.render_overlay();
 
             let _ = renderer.begin_frame();

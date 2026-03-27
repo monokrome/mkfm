@@ -63,7 +63,7 @@ impl PreviewState {
         &mut self,
         renderer: &dyn mkui::render::Renderer,
         file_path: Option<&std::path::Path>,
-        overlay_enabled: bool,
+        preview_enabled: bool,
     ) {
         // Track if the file changed
         let path_changed = match (&self.current_path, file_path) {
@@ -75,7 +75,7 @@ impl PreviewState {
 
         self.current_path = file_path.map(|p| p.to_path_buf());
 
-        if !overlay_enabled || self.mode != PreviewMode::Overlay {
+        if !preview_enabled || self.mode != PreviewMode::Overlay {
             // Destroy overlay if it exists but shouldn't
             if let Some(ref mut overlay) = self.overlay {
                 overlay.destroy_surface();

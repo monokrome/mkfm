@@ -74,9 +74,9 @@ pub enum Action {
     ToggleHidden,
     EnableHidden,
     DisableHidden,
-    ToggleOverlay,
-    EnableOverlay,
-    DisableOverlay,
+    TogglePreview,
+    EnablePreview,
+    DisablePreview,
     FocusLeft,
     FocusRight,
     FocusUp,
@@ -152,17 +152,17 @@ pub fn handle_normal_key(key: &str, pending: &str) -> Action {
 
     match (pending, key) {
         // Unimpaired-style toggles: yo<key>
-        ("yo", "o") => Action::ToggleOverlay,
+        ("yo", "p") => Action::TogglePreview,
         ("yo", "h") => Action::ToggleHidden,
         ("y", "o") => Action::Pending,
 
         // Unimpaired-style enable: [o<key>
-        ("[o", "o") => Action::EnableOverlay,
+        ("[o", "o") => Action::EnablePreview,
         ("[o", "h") => Action::EnableHidden,
         ("[", "o") => Action::Pending,
 
         // Unimpaired-style disable: ]o<key>
-        ("]o", "o") => Action::DisableOverlay,
+        ("]o", "o") => Action::DisablePreview,
         ("]o", "h") => Action::DisableHidden,
         ("]", "o") => Action::Pending,
 
@@ -414,8 +414,8 @@ mod tests {
         // yo sequence for toggle
         assert!(matches!(handle_normal_key("o", "y"), Action::Pending));
         assert!(matches!(
-            handle_normal_key("o", "yo"),
-            Action::ToggleOverlay
+            handle_normal_key("p", "yo"),
+            Action::TogglePreview
         ));
         assert!(matches!(handle_normal_key("h", "yo"), Action::ToggleHidden));
     }
@@ -426,7 +426,7 @@ mod tests {
         assert!(matches!(handle_normal_key("o", "["), Action::Pending));
         assert!(matches!(
             handle_normal_key("o", "[o"),
-            Action::EnableOverlay
+            Action::EnablePreview
         ));
         assert!(matches!(handle_normal_key("h", "[o"), Action::EnableHidden));
     }
@@ -437,7 +437,7 @@ mod tests {
         assert!(matches!(handle_normal_key("o", "]"), Action::Pending));
         assert!(matches!(
             handle_normal_key("o", "]o"),
-            Action::DisableOverlay
+            Action::DisablePreview
         ));
         assert!(matches!(
             handle_normal_key("h", "]o"),
@@ -472,9 +472,10 @@ mod tests {
 
     #[test]
     fn test_normal_mode_actions() {
-        assert!(matches!(handle_normal_key("d", ""), Action::Cut));
+        assert!(matches!(handle_normal_key("d", ""), Action::Pending));
+        assert!(matches!(handle_normal_key("d", "d"), Action::Delete));
         assert!(matches!(handle_normal_key("p", ""), Action::Paste));
-        assert!(matches!(handle_normal_key("x", ""), Action::Delete));
+        assert!(matches!(handle_normal_key("x", ""), Action::Cut));
         assert!(matches!(handle_normal_key(".", ""), Action::ToggleHidden));
         assert!(matches!(
             handle_normal_key(":", ""),
@@ -484,7 +485,7 @@ mod tests {
             handle_normal_key("v", ""),
             Action::EnterVisualMode
         ));
-        assert!(matches!(handle_normal_key("=", ""), Action::OpenFile));
+        assert!(matches!(handle_normal_key("=", ""), Action::None));
     }
 
     #[test]

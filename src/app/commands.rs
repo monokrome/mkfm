@@ -30,8 +30,8 @@ impl App {
     fn apply_set_option(&mut self, option: &str, negated: bool) -> CommandResult {
         match option {
             "hidden" | "hid" => self.apply_hidden_option(negated),
-            "overlay" | "ol" => {
-                self.overlay_enabled = !negated;
+            "preview" | "prev" => {
+                self.preview_enabled = !negated;
                 CommandResult::Redraw
             }
             "parent" | "par" => self.apply_parent_option(negated),

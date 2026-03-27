@@ -42,9 +42,9 @@ impl App {
             Action::ToggleHidden => self.execute_toggle_hidden(),
             Action::EnableHidden => self.execute_enable_hidden(),
             Action::DisableHidden => self.execute_disable_hidden(),
-            Action::ToggleOverlay => self.execute_toggle_overlay(),
-            Action::EnableOverlay => self.execute_enable_overlay(),
-            Action::DisableOverlay => self.execute_disable_overlay(),
+            Action::TogglePreview => self.execute_toggle_preview(),
+            Action::EnablePreview => self.execute_enable_preview(),
+            Action::DisablePreview => self.execute_disable_preview(),
 
             // Split/focus actions
             Action::FocusLeft => self.execute_focus_left(),

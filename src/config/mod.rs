@@ -97,7 +97,7 @@ impl Config {
 
     pub async fn overlay(&self) -> OverlayConfig {
         let mut config = OverlayConfig::default();
-        self.load_overlay_enabled(&mut config).await;
+        self.load_preview_enabled(&mut config).await;
         self.load_overlay_margin(&mut config).await;
         self.load_overlay_position(&mut config).await;
         self.load_overlay_offset(&mut config).await;
@@ -105,7 +105,7 @@ impl Config {
         config
     }
 
-    async fn load_overlay_enabled(&self, config: &mut OverlayConfig) {
+    async fn load_preview_enabled(&self, config: &mut OverlayConfig) {
         if let Some(enabled) = self.get_bool("overlay.enabled").await {
             config.enabled = enabled;
         }
