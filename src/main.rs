@@ -142,15 +142,6 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if matches!(event.kind, EventKind::Redraw) {
-            // Initialize overlay after the first frame so the compositor
-            // has a committed surface with a scene tree
-            if !overlay_initialized {
-                let _ = renderer.begin_frame();
-                let _ = renderer.end_frame();
-                preview.init_overlay(renderer);
-                overlay_initialized = true;
-            }
-
             event_loop::poll_job_updates(&mut app);
 
             let current_file = app.browser().and_then(|b| {
@@ -163,6 +154,12 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             let _ = renderer.clear();
             app_render::render_app(renderer, &app, &app.theme, &mut preview, &mut tracker);
             let _ = renderer.end_frame();
+
+            // Init overlay after the first real frame is committed
+            if !overlay_initialized {
+                preview.init_overlay(renderer);
+                overlay_initialized = true;
+            }
         }
 
         true
