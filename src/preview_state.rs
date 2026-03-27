@@ -94,20 +94,41 @@ impl PreviewState {
             return;
         }
 
-        // Create surface if it doesn't exist
+        // Create or resize surface to fill available space from its anchor
         if overlay.surface().is_none() {
             use mkui::gui::WgpuRenderer;
             use winit::platform::wayland::WindowExtWayland;
 
             if let Some(gpu) = renderer.as_any().downcast_ref::<WgpuRenderer>() {
+                let win_size = gpu.window().inner_size();
+                let anchor = Anchor::Right; // TODO: make configurable
+                let margin = 8i32;
+
+                // Size fills from the anchor edge: horizontal anchors get half
+                // width + full height, vertical anchors get full width + half height
+                let (width, height) = match anchor {
+                    Anchor::Left | Anchor::Right => (
+                        win_size.width / 2,
+                        win_size.height.saturating_sub(margin as u32 * 2),
+                    ),
+                    Anchor::Top | Anchor::Bottom => (
+                        win_size.width.saturating_sub(margin as u32 * 2),
+                        win_size.height / 2,
+                    ),
+                    Anchor::None => (
+                        win_size.width / 2,
+                        win_size.height / 2,
+                    ),
+                };
+
                 if let Some(toplevel_ptr) = gpu.window().xdg_toplevel() {
                     overlay.create_surface(
                         toplevel_ptr,
-                        Anchor::Right,
-                        8,  // margin
-                        0,  // offset
-                        400,
-                        600,
+                        anchor,
+                        margin,
+                        0,
+                        width.max(1),
+                        height.max(1),
                     );
                 }
             }
