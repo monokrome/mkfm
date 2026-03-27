@@ -29,6 +29,12 @@ impl PreviewCache {
         is_image_file(path) || is_svg_file(path) || is_text_file(path) || is_media_file(path)
     }
 
+    /// Get the natural pixel dimensions of an image without decoding it.
+    /// Returns None for non-image files or on error.
+    pub fn image_dimensions(path: &std::path::Path) -> Option<(u32, u32)> {
+        image::image_dimensions(path).ok()
+    }
+
     pub fn get_or_load(
         &mut self,
         path: &std::path::Path,

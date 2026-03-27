@@ -111,7 +111,8 @@ impl PreviewState {
         let path_changed = self.current_path.as_deref() != Some(path);
         self.current_path = Some(path.to_path_buf());
 
-        // Get window size for overlay bounds
+        // Size the overlay: use the image's natural dimensions bounded by
+        // available screen space. No decoding — just read the header.
         use mkui::gui::WgpuRenderer;
         let Some(gpu) = renderer.as_any().downcast_ref::<WgpuRenderer>() else {
             return;
@@ -120,7 +121,8 @@ impl PreviewState {
         let anchor = Anchor::Right; // TODO: make configurable
         let margin = 8i32;
 
-        let (desired_w, desired_h) = match anchor {
+        // Max available space from the anchor edge
+        let (max_w, max_h) = match anchor {
             Anchor::Left | Anchor::Right => (
                 win_size.width / 2,
                 win_size.height.saturating_sub(margin as u32 * 2),
@@ -132,8 +134,20 @@ impl PreviewState {
             Anchor::None => (win_size.width / 2, win_size.height / 2),
         };
 
-        let desired_w = desired_w.max(1);
-        let desired_h = desired_h.max(1);
+        // Get natural content size, then fit within available space
+        let (desired_w, desired_h) = if let Some((nat_w, nat_h)) = PreviewCache::image_dimensions(path) {
+            // Scale image to fit, preserving aspect ratio
+            let scale_x = max_w as f32 / nat_w as f32;
+            let scale_y = max_h as f32 / nat_h as f32;
+            let scale = scale_x.min(scale_y).min(1.0); // never upscale
+            (
+                ((nat_w as f32 * scale) as u32).max(1),
+                ((nat_h as f32 * scale) as u32).max(1),
+            )
+        } else {
+            // Text/media/unknown — use full available space
+            (max_w.max(1), max_h.max(1))
+        };
 
         // Create surface if needed
         if overlay.surface().is_none() {
@@ -217,34 +231,29 @@ fn render_to_pixel_buffer(
         height: img_h,
     } = content
     {
-        let scale_x = *img_w as f32 / width as f32;
-        let scale_y = *img_h as f32 / height as f32;
-        let scale = scale_x.max(scale_y).max(1.0);
+        // Image data is RGBA (4 bytes per pixel), already scaled to fit
+        // by the loader. Just center it in the buffer.
+        let off_x = width.saturating_sub(*img_w) / 2;
+        let off_y = height.saturating_sub(*img_h) / 2;
 
-        let dst_w = (*img_w as f32 / scale) as u32;
-        let dst_h = (*img_h as f32 / scale) as u32;
-        let off_x = width.saturating_sub(dst_w) / 2;
-        let off_y = height.saturating_sub(dst_h) / 2;
-
-        for dy in 0..dst_h.min(height) {
-            for dx in 0..dst_w.min(width) {
-                let src_x = (dx as f32 * scale) as u32;
-                let src_y = (dy as f32 * scale) as u32;
-
-                if src_x < *img_w && src_y < *img_h {
-                    let src_idx = ((src_y * img_w + src_x) * 3) as usize;
-                    let dst_x = dx + off_x;
-                    let dst_y = dy + off_y;
-
-                    if dst_x < width && dst_y < height && src_idx + 2 < data.len() {
-                        let dst_idx = ((dst_y * width + dst_x) * 4) as usize;
-                        // BGRA for Wayland ARGB8888
-                        buffer[dst_idx] = data[src_idx + 2]; // B
-                        buffer[dst_idx + 1] = data[src_idx + 1]; // G
-                        buffer[dst_idx + 2] = data[src_idx]; // R
-                        buffer[dst_idx + 3] = 255; // A
-                    }
+        for y in 0..*img_h {
+            if y + off_y >= height {
+                break;
+            }
+            for x in 0..*img_w {
+                if x + off_x >= width {
+                    break;
                 }
+                let src_idx = ((y * img_w + x) * 4) as usize;
+                if src_idx + 3 >= data.len() {
+                    continue;
+                }
+                let dst_idx = (((y + off_y) * width + (x + off_x)) * 4) as usize;
+                // RGBA -> BGRA for Wayland ARGB8888
+                buffer[dst_idx] = data[src_idx + 2];     // B
+                buffer[dst_idx + 1] = data[src_idx + 1]; // G
+                buffer[dst_idx + 2] = data[src_idx];     // R
+                buffer[dst_idx + 3] = data[src_idx + 3]; // A
             }
         }
     }

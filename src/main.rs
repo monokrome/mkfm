@@ -148,6 +148,19 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 preview_state::PreviewState::new_for_renderer(renderer)
             });
 
+            // Video playback: stop if cursor moved to a different file
+            if app.playback.is_some() {
+                let current = app.browser().and_then(|b| {
+                    b.entries.get(b.cursor).map(|e| b.path.join(&e.name))
+                });
+                if current.as_deref() != app.media_path.as_deref() {
+                    app.playback.take();
+                }
+            }
+            if let Some(ref mut playback) = app.playback {
+                playback.advance();
+            }
+
             event_loop::poll_job_updates(&mut app);
 
             let current_file = app.browser().and_then(|b| {
