@@ -19,9 +19,11 @@ impl App {
         // Otherwise open the file
         let paths = self.get_paths_for_open();
         if !paths.is_empty() {
-            self.openers.open_files(&paths);
+            if let Some(mime) = self.openers.open_files(&paths) {
+                self.status_message = Some(format!("No opener for: {mime}"));
+            }
         }
-        false
+        true
     }
 
     fn get_paths_for_open(&self) -> Vec<PathBuf> {

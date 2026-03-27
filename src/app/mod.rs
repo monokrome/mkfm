@@ -105,6 +105,8 @@ pub struct App {
     pub preview_zoom: f32,
     // Pending confirmation (e.g., "delete? press y to confirm")
     pub pending_confirm: Option<PendingAction>,
+    /// Transient status message (shown once, cleared on next keypress)
+    pub status_message: Option<String>,
 }
 
 impl App {
@@ -204,6 +206,7 @@ impl App {
             media_position: 0.0,
             preview_zoom: 1.0,
             pending_confirm: None,
+            status_message: None,
         }
     }
 
@@ -275,6 +278,9 @@ impl App {
                 return false;
             }
         }
+
+        // Clear transient status message on any keypress
+        self.status_message = None;
 
         let action = handle_key(self.mode, key_str, &self.pending_keys, self.vi_mode);
 

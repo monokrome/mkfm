@@ -43,16 +43,21 @@ impl Openers {
     }
 
     /// Get the opener command for a file path
-    pub fn get_opener(&self, path: &Path) -> String {
+    pub fn get_opener(&self, path: &Path) -> Option<String> {
         let mime = self.detect_mime(path);
 
         for (pattern, cmd) in &self.rules {
             if self.matches_pattern(&mime, pattern) {
-                return cmd.clone();
+                return Some(cmd.clone());
             }
         }
 
-        "xdg-open {}".to_string()
+        None
+    }
+
+    /// Detect the MIME type for a file
+    pub fn detect_mime_for(&self, path: &Path) -> String {
+        self.detect_mime(path)
     }
 
     fn detect_mime(&self, path: &Path) -> String {
@@ -86,19 +91,33 @@ impl Openers {
     }
 
     /// Execute opener command(s) for a list of files
-    pub fn open_files(&self, paths: &[PathBuf]) {
+    /// Open files with configured openers. Returns the mime type of the
+    /// first file that had no opener, or None if all files were handled.
+    pub fn open_files(&self, paths: &[PathBuf]) -> Option<String> {
         let mut groups: HashMap<String, Vec<&PathBuf>> = HashMap::new();
+        let mut no_opener_mime = None;
+
         for path in paths {
             if path.is_dir() {
                 continue;
             }
-            let cmd = self.get_opener(path);
-            groups.entry(cmd).or_default().push(path);
+            if let Some(cmd) = self.get_opener(path) {
+                groups.entry(cmd).or_default().push(path);
+            } else if no_opener_mime.is_none() {
+                let mime = self.detect_mime(path);
+                no_opener_mime = Some(if mime.is_empty() {
+                    "unknown".to_string()
+                } else {
+                    mime
+                });
+            }
         }
 
         for (cmd_template, files) in groups {
             self.execute_command(&cmd_template, &files);
         }
+
+        no_opener_mime
     }
 
     fn execute_command(&self, template: &str, files: &[&PathBuf]) {

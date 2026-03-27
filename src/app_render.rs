@@ -183,22 +183,26 @@ pub fn render_app(
     let status_y = height.saturating_sub(layout.status_height);
     let status_bounds = Rect::new(0, status_y, width, layout.status_height);
     // Include pending_confirm in generation so status updates on confirm prompt
-    let confirm_active = app.pending_confirm.is_some() as u64;
+    let has_status_msg = (app.pending_confirm.is_some() || app.status_message.is_some()) as u64;
     let status_gen = (app.mode as u64) << 48
-        | (confirm_active << 47)
+        | (has_status_msg << 47)
         | app.browser().map_or(0, |b| (b.cursor as u64) << 16 | b.entries.len() as u64);
 
-    let confirm_message = app.pending_confirm.as_ref().map(|action| {
-        match action {
-            crate::app::PendingAction::Delete(paths) => {
-                if paths.len() == 1 {
-                    format!("Delete {:?}? (y/N)", paths[0].file_name().unwrap_or_default())
-                } else {
-                    format!("Delete {} items? (y/N)", paths.len())
+    let status_message = if let Some(ref msg) = app.status_message {
+        Some(msg.clone())
+    } else {
+        app.pending_confirm.as_ref().map(|action| {
+            match action {
+                crate::app::PendingAction::Delete(paths) => {
+                    if paths.len() == 1 {
+                        format!("Delete {:?}? (y/N)", paths[0].file_name().unwrap_or_default())
+                    } else {
+                        format!("Delete {} items? (y/N)", paths.len())
+                    }
                 }
             }
-        }
-    });
+        })
+    };
 
     if tracker.needs_render(renderer, ID_STATUS, status_gen, status_bounds) {
         let cursor_info = app.browser().map(|b| (b.cursor, b.entries.len()));
@@ -214,7 +218,7 @@ pub fn render_app(
             app.job_queue.active_count(),
             app.job_queue.failed_count(),
             cursor_info,
-            confirm_message.as_deref(),
+            status_message.as_deref(),
             status_y,
             width,
             &colors,
