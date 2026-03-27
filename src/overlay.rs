@@ -158,6 +158,17 @@ impl OverlayManager {
         Some(id)
     }
 
+    /// Resize the overlay surface
+    pub fn resize_surface(&mut self, width: u32, height: u32) {
+        if let Some(ref mut surface) = self.state.surface {
+            surface.attached.set_size(width, height);
+            surface.width = width;
+            surface.height = height;
+            surface.dirty = true;
+            surface.surface.commit();
+        }
+    }
+
     /// Destroy the current overlay surface
     pub fn destroy_surface(&mut self) {
         if let Some(surface) = self.state.surface.take() {

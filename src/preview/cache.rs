@@ -23,6 +23,12 @@ impl PreviewCache {
         }
     }
 
+    /// Quick check if a file has previewable content (by extension)
+    pub fn is_previewable(path: &std::path::Path) -> bool {
+        use super::{is_image_file, is_svg_file, is_text_file, is_media_file};
+        is_image_file(path) || is_svg_file(path) || is_text_file(path) || is_media_file(path)
+    }
+
     pub fn get_or_load(
         &mut self,
         path: &std::path::Path,

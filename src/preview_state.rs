@@ -89,48 +89,69 @@ impl PreviewState {
 
         overlay.dispatch();
 
-        if file_path.is_none() {
+        // Only show overlay for previewable files
+        let Some(path) = file_path else {
+            overlay.destroy_surface();
+            return;
+        };
+
+        if !PreviewCache::is_previewable(path) {
             overlay.destroy_surface();
             return;
         }
 
-        // Create or resize surface to fill available space from its anchor
+        // Get window bounds for constraining overlay size
+        use mkui::gui::WgpuRenderer;
+        let Some(gpu) = renderer.as_any().downcast_ref::<WgpuRenderer>() else {
+            return;
+        };
+        let win_size = gpu.window().inner_size();
+        let anchor = Anchor::Right; // TODO: make configurable
+        let margin = 8i32;
+
+        // Max available space from the anchor edge
+        let (max_w, max_h) = match anchor {
+            Anchor::Left | Anchor::Right => (
+                win_size.width / 2,
+                win_size.height.saturating_sub(margin as u32 * 2),
+            ),
+            Anchor::Top | Anchor::Bottom => (
+                win_size.width.saturating_sub(margin as u32 * 2),
+                win_size.height / 2,
+            ),
+            Anchor::None => (
+                win_size.width / 2,
+                win_size.height / 2,
+            ),
+        };
+
+        // Load content to get natural dimensions, bounded by available space
+        let content = self.cache.get_or_load(path, max_w.max(1), max_h.max(1));
+        let (desired_w, desired_h) = content.dimensions(max_w.max(1), max_h.max(1));
+
+        if desired_w == 0 || desired_h == 0 {
+            overlay.destroy_surface();
+            return;
+        }
+
+        // Create or resize surface to match content
         if overlay.surface().is_none() {
-            use mkui::gui::WgpuRenderer;
             use winit::platform::wayland::WindowExtWayland;
 
-            if let Some(gpu) = renderer.as_any().downcast_ref::<WgpuRenderer>() {
-                let win_size = gpu.window().inner_size();
-                let anchor = Anchor::Right; // TODO: make configurable
-                let margin = 8i32;
-
-                // Size fills from the anchor edge: horizontal anchors get half
-                // width + full height, vertical anchors get full width + half height
-                let (width, height) = match anchor {
-                    Anchor::Left | Anchor::Right => (
-                        win_size.width / 2,
-                        win_size.height.saturating_sub(margin as u32 * 2),
-                    ),
-                    Anchor::Top | Anchor::Bottom => (
-                        win_size.width.saturating_sub(margin as u32 * 2),
-                        win_size.height / 2,
-                    ),
-                    Anchor::None => (
-                        win_size.width / 2,
-                        win_size.height / 2,
-                    ),
-                };
-
-                if let Some(toplevel_ptr) = gpu.window().xdg_toplevel() {
-                    overlay.create_surface(
-                        toplevel_ptr,
-                        anchor,
-                        margin,
-                        0,
-                        width.max(1),
-                        height.max(1),
-                    );
-                }
+            if let Some(toplevel_ptr) = gpu.window().xdg_toplevel() {
+                overlay.create_surface(
+                    toplevel_ptr,
+                    anchor,
+                    margin,
+                    0,
+                    desired_w,
+                    desired_h,
+                );
+            }
+        } else if let Some(surface) = overlay.surface() {
+            if surface.width != desired_w || surface.height != desired_h {
+                overlay.resize_surface(desired_w, desired_h);
+                self.needs_render = true;
             }
         }
 
@@ -194,13 +215,8 @@ fn render_to_pixel_buffer(
     let size = (width * height * 4) as usize;
     let mut buffer = vec![0u8; size];
 
-    // Fill with dark background (BGRA for Wayland ARGB8888)
-    for pixel in buffer.chunks_exact_mut(4) {
-        pixel[0] = 30;  // B
-        pixel[1] = 30;  // G
-        pixel[2] = 35;  // R
-        pixel[3] = 255; // A
-    }
+    // Transparent background — overlay is content only, no chrome
+    // Buffer is already zeroed (BGRA with alpha=0)
 
     if let PreviewContent::Image { data, width: img_w, height: img_h } = content {
         let scale_x = *img_w as f32 / width as f32;
