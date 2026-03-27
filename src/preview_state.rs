@@ -10,11 +10,9 @@ use crate::attached_surface::Anchor;
 use crate::overlay::OverlayManager;
 use crate::preview::PreviewCache;
 
-/// Preview rendering mode
+/// Preview rendering mode — determined once at startup, never changes
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PreviewMode {
-    /// Not yet determined — waiting for init_overlay to detect capabilities
-    Pending,
     /// Render inline within the browser pane
     Inline,
     /// Render in a Wayland attached surface overlay
@@ -31,60 +29,61 @@ pub struct PreviewState {
 }
 
 impl PreviewState {
-    pub fn new() -> Self {
+    /// Create for TUI — always inline, no overlay detection needed
+    pub fn new_inline() -> Self {
         PreviewState {
             cache: PreviewCache::new(),
-            mode: PreviewMode::Pending,
+            mode: PreviewMode::Inline,
             overlay: None,
             current_path: None,
             needs_render: false,
         }
     }
 
-    /// Detect overlay support and initialize if available.
-    /// Call once after the renderer is created.
-    pub fn init_overlay(&mut self, renderer: &dyn mkui::render::Renderer) {
+    /// Create for GUI — detect overlay support once, set mode permanently
+    pub fn new_for_renderer(renderer: &dyn mkui::render::Renderer) -> Self {
         use mkui::gui::WgpuRenderer;
 
-        let Some(gpu) = renderer.as_any().downcast_ref::<WgpuRenderer>() else {
-            // Not a GUI renderer — use inline
-            self.mode = PreviewMode::Inline;
-            return;
+        let mut state = PreviewState {
+            cache: PreviewCache::new(),
+            mode: PreviewMode::Inline, // default if no overlay support
+            overlay: None,
+            current_path: None,
+            needs_render: false,
         };
 
-        let overlay = OverlayManager::new(gpu.window());
-        if let Some(ref overlay) = overlay {
-            if overlay.has_attached_surface() {
-                self.mode = PreviewMode::Overlay;
-            } else {
-                self.mode = PreviewMode::Inline;
+        if let Some(gpu) = renderer.as_any().downcast_ref::<WgpuRenderer>() {
+            let overlay = OverlayManager::new(gpu.window());
+            if let Some(ref overlay) = overlay {
+                if overlay.has_attached_surface() {
+                    state.mode = PreviewMode::Overlay;
+                }
             }
-        } else {
-            self.mode = PreviewMode::Inline;
+            state.overlay = overlay;
         }
-        self.overlay = overlay;
+
+        state
     }
 
-    /// Create or update the overlay surface for the current file.
-    /// Call from the render loop when the cursor changes.
+    /// Is the overlay surface currently showing content?
+    pub fn is_overlay_active(&self) -> bool {
+        self.mode == PreviewMode::Overlay
+            && self.overlay.as_ref().is_some_and(|o| o.surface().is_some())
+    }
+
+    /// Update the overlay surface for the current file.
+    /// Only does anything in Overlay mode.
     pub fn update_overlay(
         &mut self,
         renderer: &dyn mkui::render::Renderer,
         file_path: Option<&std::path::Path>,
         preview_enabled: bool,
     ) {
-        // Track if the file changed
-        let path_changed = match (&self.current_path, file_path) {
-            (Some(old), Some(new)) => old != new,
-            (None, Some(_)) => true,
-            (Some(_), None) => true,
-            (None, None) => false,
-        };
+        if self.mode != PreviewMode::Overlay {
+            return;
+        }
 
-        self.current_path = file_path.map(|p| p.to_path_buf());
-
-        if !preview_enabled || self.mode != PreviewMode::Overlay {
-            // Destroy overlay if it exists but shouldn't
+        if !preview_enabled {
             if let Some(ref mut overlay) = self.overlay {
                 overlay.destroy_surface();
             }
@@ -97,7 +96,7 @@ impl PreviewState {
 
         overlay.dispatch();
 
-        // Only show overlay for previewable files
+        // Destroy surface when no file or not previewable
         let Some(path) = file_path else {
             overlay.destroy_surface();
             return;
@@ -108,7 +107,11 @@ impl PreviewState {
             return;
         }
 
-        // Get window bounds for constraining overlay size
+        // Track file changes
+        let path_changed = self.current_path.as_deref() != Some(path);
+        self.current_path = Some(path.to_path_buf());
+
+        // Get window size for overlay bounds
         use mkui::gui::WgpuRenderer;
         let Some(gpu) = renderer.as_any().downcast_ref::<WgpuRenderer>() else {
             return;
@@ -117,8 +120,7 @@ impl PreviewState {
         let anchor = Anchor::Right; // TODO: make configurable
         let margin = 8i32;
 
-        // Max available space from the anchor edge
-        let (max_w, max_h) = match anchor {
+        let (desired_w, desired_h) = match anchor {
             Anchor::Left | Anchor::Right => (
                 win_size.width / 2,
                 win_size.height.saturating_sub(margin as u32 * 2),
@@ -127,22 +129,13 @@ impl PreviewState {
                 win_size.width.saturating_sub(margin as u32 * 2),
                 win_size.height / 2,
             ),
-            Anchor::None => (
-                win_size.width / 2,
-                win_size.height / 2,
-            ),
+            Anchor::None => (win_size.width / 2, win_size.height / 2),
         };
 
-        // Load content to get natural dimensions, bounded by available space
-        let content = self.cache.get_or_load(path, max_w.max(1), max_h.max(1));
-        let (desired_w, desired_h) = content.dimensions(max_w.max(1), max_h.max(1));
+        let desired_w = desired_w.max(1);
+        let desired_h = desired_h.max(1);
 
-        if desired_w == 0 || desired_h == 0 {
-            overlay.destroy_surface();
-            return;
-        }
-
-        // Create or resize surface to match content
+        // Create surface if needed
         if overlay.surface().is_none() {
             use winit::platform::wayland::WindowExtWayland;
 
@@ -157,6 +150,7 @@ impl PreviewState {
                 );
             }
         } else if let Some(surface) = overlay.surface() {
+            // Resize if window dimensions changed
             if surface.width != desired_w || surface.height != desired_h {
                 overlay.resize_surface(desired_w, desired_h);
                 self.needs_render = true;
@@ -169,7 +163,7 @@ impl PreviewState {
     }
 
     /// Render preview content to the overlay surface.
-    /// Returns true if the overlay handled rendering (caller should skip inline).
+    /// Returns true if the overlay handled rendering.
     pub fn render_overlay(&mut self) -> bool {
         if self.mode != PreviewMode::Overlay {
             return false;
@@ -180,7 +174,6 @@ impl PreviewState {
             None => return false,
         };
 
-        // Check if surface exists and needs rendering
         let (width, height, needs_work) = match overlay.surface() {
             Some(s) => (s.width, s.height, self.needs_render || s.dirty),
             None => return false,
@@ -202,17 +195,11 @@ impl PreviewState {
             surface.dirty = false;
         }
         self.needs_render = false;
-        true
-    }
 
-    /// Check if overlay is active (caller should skip inline preview)
-    pub fn is_overlay_active(&self) -> bool {
-        self.mode == PreviewMode::Overlay
-            && self.overlay.as_ref().is_some_and(|o| o.surface().is_some())
+        true
     }
 }
 
-/// Render preview content to a BGRA pixel buffer for Wayland submission
 fn render_to_pixel_buffer(
     content: &crate::preview::PreviewContent,
     width: u32,
@@ -221,12 +208,15 @@ fn render_to_pixel_buffer(
     use crate::preview::PreviewContent;
 
     let size = (width * height * 4) as usize;
+    // Transparent background — overlay is content only
     let mut buffer = vec![0u8; size];
 
-    // Transparent background — overlay is content only, no chrome
-    // Buffer is already zeroed (BGRA with alpha=0)
-
-    if let PreviewContent::Image { data, width: img_w, height: img_h } = content {
+    if let PreviewContent::Image {
+        data,
+        width: img_w,
+        height: img_h,
+    } = content
+    {
         let scale_x = *img_w as f32 / width as f32;
         let scale_y = *img_h as f32 / height as f32;
         let scale = scale_x.max(scale_y).max(1.0);
@@ -238,16 +228,54 @@ fn render_to_pixel_buffer(
 
         for dy in 0..dst_h.min(height) {
             for dx in 0..dst_w.min(width) {
-                let sx = (dx as f32 * scale) as u32;
-                let sy = (dy as f32 * scale) as u32;
-                if sx < *img_w && sy < *img_h {
-                    let src_idx = ((sy * img_w + sx) * 4) as usize;
-                    let dst_idx = (((off_y + dy) * width + (off_x + dx)) * 4) as usize;
-                    if src_idx + 3 < data.len() && dst_idx + 3 < buffer.len() {
-                        buffer[dst_idx] = data[src_idx + 2];     // B
+                let src_x = (dx as f32 * scale) as u32;
+                let src_y = (dy as f32 * scale) as u32;
+
+                if src_x < *img_w && src_y < *img_h {
+                    let src_idx = ((src_y * img_w + src_x) * 3) as usize;
+                    let dst_x = dx + off_x;
+                    let dst_y = dy + off_y;
+
+                    if dst_x < width && dst_y < height && src_idx + 2 < data.len() {
+                        let dst_idx = ((dst_y * width + dst_x) * 4) as usize;
+                        // BGRA for Wayland ARGB8888
+                        buffer[dst_idx] = data[src_idx + 2]; // B
                         buffer[dst_idx + 1] = data[src_idx + 1]; // G
-                        buffer[dst_idx + 2] = data[src_idx];     // R
-                        buffer[dst_idx + 3] = data[src_idx + 3]; // A
+                        buffer[dst_idx + 2] = data[src_idx]; // R
+                        buffer[dst_idx + 3] = 255; // A
+                    }
+                }
+            }
+        }
+    }
+
+    if let PreviewContent::Text(lines) = content {
+        // Simple text rendering — each char is ~8x16 pixels
+        let char_w = 8u32;
+        let char_h = 16u32;
+
+        for (line_idx, line) in lines.iter().enumerate() {
+            let y_start = line_idx as u32 * char_h;
+            if y_start >= height {
+                break;
+            }
+
+            for (char_idx, _ch) in line.chars().enumerate() {
+                let x_start = char_idx as u32 * char_w;
+                if x_start >= width {
+                    break;
+                }
+
+                // Draw a simple white block for each character
+                for py in 0..char_h.min(height - y_start) {
+                    for px in 0..char_w.min(width - x_start) {
+                        let dst_idx = (((y_start + py) * width + (x_start + px)) * 4) as usize;
+                        if dst_idx + 3 < buffer.len() {
+                            buffer[dst_idx] = 200; // B
+                            buffer[dst_idx + 1] = 200; // G
+                            buffer[dst_idx + 2] = 200; // R
+                            buffer[dst_idx + 3] = 255; // A
+                        }
                     }
                 }
             }

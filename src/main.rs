@@ -47,8 +47,7 @@ fn run_tui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut renderer = TerminalRenderer::new()?;
     renderer.enter_alt_screen()?;
-    let mut preview = preview_state::PreviewState::new();
-    preview.mode = preview_state::PreviewMode::Inline;
+    let mut preview = preview_state::PreviewState::new_inline();
     let mut tracker = mkui::component_state::RenderTracker::new();
 
     let events = EventPoller::new()?;
@@ -116,12 +115,10 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         rt.block_on(App::new(vec![], mkui::layout::SplitDirection::Vertical))
     });
 
-    let mut preview = preview_state::PreviewState::new();
+    let mut preview: Option<preview_state::PreviewState> = None;
     let mut tracker = mkui::component_state::RenderTracker::new();
-    let mut overlay_initialized = false;
 
     MkuiApp::run_gui("mkfm", 16.0, move |event: &Event, renderer: &mut dyn Renderer| {
-
         if let Some(key) = event.kind.pressed_key() {
             if let Some(key_str) = key_to_string(key, event) {
                 app.process_key(&key_str);
@@ -143,6 +140,14 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if matches!(event.kind, EventKind::Redraw) {
+            // Initialize preview state on first frame — determines mode once
+            let preview = preview.get_or_insert_with(|| {
+                // Render one frame first so the compositor has a committed surface
+                let _ = renderer.begin_frame();
+                let _ = renderer.end_frame();
+                preview_state::PreviewState::new_for_renderer(renderer)
+            });
+
             event_loop::poll_job_updates(&mut app);
 
             let current_file = app.browser().and_then(|b| {
@@ -153,14 +158,8 @@ fn run_gui(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
             let _ = renderer.begin_frame();
             let _ = renderer.clear();
-            app_render::render_app(renderer, &app, &app.theme, &mut preview, &mut tracker);
+            app_render::render_app(renderer, &app, &app.theme, preview, &mut tracker);
             let _ = renderer.end_frame();
-
-            // Init overlay after the first real frame is committed
-            if !overlay_initialized {
-                preview.init_overlay(renderer);
-                overlay_initialized = true;
-            }
         }
 
         true

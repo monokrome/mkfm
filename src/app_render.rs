@@ -74,12 +74,9 @@ pub fn render_app(
             let browser_gen = hasher.finish();
 
             let has_video = focused && app.playback.as_ref().is_some_and(|p| !p.current_frame.is_empty());
-            // Video always renders inline (can't stream to overlay yet).
-            // Static previews use inline when overlay isn't active.
             let show_inline_preview = app.preview_enabled
-                && (has_video || !preview.is_overlay_active())
-                && preview.mode != crate::preview_state::PreviewMode::Pending
-                && pane_rect.width >= PREVIEW_MIN_WIDTH;
+                && pane_rect.width >= PREVIEW_MIN_WIDTH
+                && (preview.mode == crate::preview_state::PreviewMode::Inline || has_video);
 
             let (list_rect, preview_rect) = if show_inline_preview {
                 let list_w = calculate_list_width(browser, pane_rect.width);
